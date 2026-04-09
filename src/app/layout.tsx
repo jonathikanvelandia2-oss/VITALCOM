@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Orbitron, Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google'
+import { CookieConsent } from '@/components/shared/CookieConsent'
 import './globals.css'
 
 // Fuentes oficiales Vitalcom (ver CLAUDE.md → Tipografía)
@@ -54,7 +55,10 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${orbitron.variable} ${spaceGrotesk.variable} ${inter.variable} ${jetbrains.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        {children}
+        <CookieConsent />
+      </body>
     </html>
   )
 }
