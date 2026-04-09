@@ -230,3 +230,55 @@ body {
   border-color: rgba(198, 255, 60, 0.5);
   box-shadow: 0 0 24px var(--vc-glow-lime);
 }
+
+/* Helpers de UI reutilizables */
+.label-sm {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vc-white-dim);
+  font-family: var(--font-heading);
+}
+
+.label-mono {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--vc-white-dim);
+  font-family: var(--font-mono);
+}
+
+.heading-sm {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--vc-white-soft);
+  font-family: var(--font-heading);
+}
+
+.btn-secondary {
+  border-radius: 10px;
+  padding: 0.625rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-family: var(--font-heading);
+  background: var(--vc-black-soft);
+  border: 1px solid var(--vc-gray-dark);
+  color: var(--vc-white-dim);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  border-color: rgba(198, 255, 60, 0.3);
+  color: var(--vc-white-soft);
+}
+
+.hero-result {
+  text-align: center;
+  padding: 1.25rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(198,255,60,0.1) 0%, rgba(168,255,0,0.18) 100%);
+  border: 1px solid rgba(198, 255, 60, 0.4);
+  box-shadow: 0 0 30px var(--vc-glow-lime);
+}
