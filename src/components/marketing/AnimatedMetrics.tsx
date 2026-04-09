@@ -171,35 +171,23 @@ function MetricCard({ metric, index, animate }: {
       </div>
 
       {/* Número animado */}
-      <div className="relative">
-        <p
-          className="text-4xl font-black md:text-5xl lg:text-6xl"
-          style={{
-            fontFamily: 'var(--font-display)',
-            background: done
-              ? 'linear-gradient(135deg, #A8FF00 0%, #C6FF3C 40%, #DFFF80 100%)'
-              : 'linear-gradient(135deg, #4A6B00 0%, #7FB800 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            transition: 'all 0.5s ease-out',
-            filter: done ? 'drop-shadow(0 0 20px rgba(198,255,60,0.3))' : 'none',
-          }}
-        >
-          {count.toLocaleString('es-CO')}{metric.suffix}
-        </p>
-
-        {/* Flash al completar */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: 'var(--vc-lime-main)',
-            opacity: 0,
-            borderRadius: 8,
-            animation: done ? 'metric-flash 0.6s ease-out forwards' : 'none',
-          }}
-        />
-      </div>
+      <p
+        className="text-4xl font-black md:text-5xl lg:text-6xl"
+        style={{
+          fontFamily: 'var(--font-display)',
+          background: done
+            ? 'linear-gradient(135deg, #A8FF00 0%, #C6FF3C 40%, #DFFF80 100%)'
+            : 'linear-gradient(135deg, #4A6B00 0%, #7FB800 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          transition: 'all 0.5s ease-out',
+          filter: done ? 'drop-shadow(0 0 20px rgba(198,255,60,0.3))' : 'none',
+          transform: done ? 'scale(1)' : 'scale(0.85)',
+        }}
+      >
+        {count.toLocaleString('es-CO')}{metric.suffix}
+      </p>
 
       {/* Label */}
       <p
