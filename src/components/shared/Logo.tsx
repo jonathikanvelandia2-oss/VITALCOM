@@ -18,24 +18,22 @@ export function Logo({
 }: LogoProps) {
   const content = (
     <div className={`flex items-center gap-3 ${className}`}>
-      <div
-        className="relative shrink-0 overflow-hidden rounded-full"
+      <Image
+        src="/assets/branding/logo-vitalcom.jpeg"
+        alt="Vitalcom"
+        width={size}
+        height={size}
+        className="shrink-0 rounded-full object-cover"
         style={{
           width: size,
           height: size,
+          maxWidth: size,
+          maxHeight: size,
           boxShadow: '0 0 18px var(--vc-glow-lime)',
           border: '1px solid rgba(198, 255, 60, 0.4)',
         }}
-      >
-        <Image
-          src="/assets/branding/logo-vitalcom.jpeg"
-          alt="Vitalcom"
-          fill
-          sizes={`${size}px`}
-          className="object-cover"
-          priority
-        />
-      </div>
+        priority
+      />
       {variant === 'full' && (
         <span
           className="vc-text-gradient text-xl font-black tracking-wider"
