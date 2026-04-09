@@ -54,6 +54,7 @@ export const PRICING_CONFIG: Record<CountryCode, CountryPricingConfig> = {
     taxName: 'IVA',
     shippingBase: 12_000,
     gateways: [
+      { name: 'Ninguna (contra entrega / Dropi)', rate: 0, fixed: 0 },
       { name: 'Wompi', rate: 0.0299, fixed: 700 },
       { name: 'MercadoPago', rate: 0.0349, fixed: 900 },
       { name: 'Nequi/Daviplata', rate: 0.015, fixed: 0 },
@@ -75,6 +76,7 @@ export const PRICING_CONFIG: Record<CountryCode, CountryPricingConfig> = {
     taxName: 'IVA',
     shippingBase: 4,
     gateways: [
+      { name: 'Ninguna (contra entrega / Dropi)', rate: 0, fixed: 0 },
       { name: 'PayPhone', rate: 0.035, fixed: 0.25 },
       { name: 'MercadoPago', rate: 0.0449, fixed: 0.30 },
       { name: 'Datafast', rate: 0.039, fixed: 0.20 },
@@ -95,6 +97,7 @@ export const PRICING_CONFIG: Record<CountryCode, CountryPricingConfig> = {
     taxName: 'IVA',
     shippingBase: 35,
     gateways: [
+      { name: 'Ninguna (contra entrega / Dropi)', rate: 0, fixed: 0 },
       { name: 'Recurrente', rate: 0.039, fixed: 2 },
       { name: 'Visanet', rate: 0.035, fixed: 1.5 },
       { name: 'Transferencia', rate: 0, fixed: 0 },
@@ -115,6 +118,7 @@ export const PRICING_CONFIG: Record<CountryCode, CountryPricingConfig> = {
     taxName: 'IVA',
     shippingBase: 3_500,
     gateways: [
+      { name: 'Ninguna (contra entrega / Dropi)', rate: 0, fixed: 0 },
       { name: 'Webpay', rate: 0.0295, fixed: 200 },
       { name: 'MercadoPago', rate: 0.0399, fixed: 350 },
       { name: 'Khipu', rate: 0.012, fixed: 0 },
@@ -126,6 +130,77 @@ export const PRICING_CONFIG: Record<CountryCode, CountryPricingConfig> = {
     avgCPA: 3_500,
     updatedYear: 2026,
   },
+}
+
+// ═══════════════════════════════════════════════════════════
+// TASAS DE CAMBIO — Base: USD (dólar estadounidense)
+// Actualizar mensualmente o integrar API de tasas en el futuro.
+// Fuente referencial: Banco de la República (CO), BCE (EC), Banguat (GT), BCCh (CL)
+// ═══════════════════════════════════════════════════════════
+
+export type ExchangeRates = {
+  /** Fecha de última actualización (YYYY-MM-DD) */
+  updatedAt: string
+  /** Fuente de las tasas */
+  source: string
+  /** Tasas: cuántas unidades de moneda local equivalen a 1 USD */
+  rates: Record<string, number>
+}
+
+export const EXCHANGE_RATES: ExchangeRates = {
+  updatedAt: '2026-04-09',
+  source: 'Bancos centrales LATAM — tasas referenciales',
+  rates: {
+    USD: 1,
+    COP: 4_150,    // 1 USD = 4.150 COP (Banco de la República)
+    GTQ: 7.75,     // 1 USD = 7.75 GTQ (Banguat)
+    CLP: 950,      // 1 USD = 950 CLP (Banco Central de Chile)
+  },
+}
+
+/**
+ * Convierte un monto de una moneda a otra.
+ * Ejemplo: convertCurrency(100_000, 'COP', 'USD') → 24.10
+ */
+export function convertCurrency(
+  amount: number,
+  from: string,
+  to: string
+): number {
+  const fromRate = EXCHANGE_RATES.rates[from]
+  const toRate = EXCHANGE_RATES.rates[to]
+  if (!fromRate || !toRate) return 0
+
+  // Convertir a USD primero, luego a la moneda destino
+  const usd = amount / fromRate
+  return usd * toRate
+}
+
+/**
+ * Formatea un monto en una moneda específica con separadores locales.
+ */
+export function formatCurrency(amount: number, currency: string): string {
+  const symbols: Record<string, string> = {
+    COP: '$', USD: '$', GTQ: 'Q', CLP: '$',
+  }
+  const sym = symbols[currency] || ''
+
+  // COP y CLP no usan decimales; USD y GTQ sí
+  if (currency === 'COP' || currency === 'CLP') {
+    return `${sym} ${Math.round(amount).toLocaleString('es-CO')}`
+  }
+  return `${sym} ${amount.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+/**
+ * Devuelve la conversión de un monto a TODAS las monedas.
+ */
+export function convertToAll(amount: number, fromCurrency: string): Record<string, number> {
+  const result: Record<string, number> = {}
+  for (const currency of Object.keys(EXCHANGE_RATES.rates)) {
+    result[currency] = convertCurrency(amount, fromCurrency, currency)
+  }
+  return result
 }
 
 /**
@@ -143,4 +218,15 @@ export function getPricingConfig(country: CountryCode = 'CO'): CountryPricingCon
 export function isConfigOutdated(country: CountryCode = 'CO'): boolean {
   const currentYear = new Date().getFullYear()
   return PRICING_CONFIG[country].updatedYear < currentYear
+}
+
+/** Lista de países para el selector */
+export const COUNTRY_LIST = Object.values(PRICING_CONFIG)
+
+/** Banderas para el selector */
+export const COUNTRY_FLAGS: Record<CountryCode, string> = {
+  CO: '🇨🇴',
+  EC: '🇪🇨',
+  GT: '🇬🇹',
+  CL: '🇨🇱',
 }
