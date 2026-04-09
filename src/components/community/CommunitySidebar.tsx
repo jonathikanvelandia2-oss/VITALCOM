@@ -13,6 +13,10 @@ import {
   User,
   Trophy,
   LogOut,
+  BarChart3,
+  Zap,
+  CheckSquare,
+  Megaphone,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 
@@ -20,6 +24,10 @@ import { Logo } from '@/components/shared/Logo'
 // Diferente al admin: orientado al miembro / dropshipper
 const NAV = [
   { href: '/feed', label: 'Feed', icon: Home },
+  { href: '/analitica', label: 'Analítica', icon: BarChart3 },
+  { href: '/marketing', label: 'Marketing', icon: Megaphone },
+  { href: '/automatizaciones', label: 'Automatizaciones', icon: Zap },
+  { href: '/tareas', label: 'Tareas', icon: CheckSquare },
   { href: '/cursos', label: 'Cursos', icon: GraduationCap },
   { href: '/eventos', label: 'Eventos', icon: Calendar },
   { href: '/herramientas/calculadora', label: 'Calculadora', icon: Calculator },
