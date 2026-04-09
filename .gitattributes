@@ -1,0 +1,38 @@
+# ── Normalización de line endings ─────────────────────────
+# Resuelve todos los warnings "LF will be replaced by CRLF"
+# y previene bugs de caché por diferencias de line endings en Windows.
+
+# Auto-detect text files and normalize to LF in repo
+* text=auto eol=lf
+
+# Explicit text files
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.jsx text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+*.html text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.env text eol=lf
+*.prisma text eol=lf
+*.sql text eol=lf
+*.sh text eol=lf
+
+# Binary files — never touch
+*.jpeg binary
+*.jpg binary
+*.png binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.skill binary
