@@ -28,7 +28,7 @@ export function Logo({
         }}
       >
         <Image
-          src="/assets/branding/imagen vitalcom.jpeg"
+          src="/assets/branding/logo-vitalcom.jpeg"
           alt="Vitalcom"
           fill
           sizes={`${size}px`}

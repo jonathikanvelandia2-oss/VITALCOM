@@ -15,6 +15,7 @@ import {
   Heart,
 } from 'lucide-react'
 import { CountryFlag } from '@/components/shared/CountryFlag'
+import { AnimatedMetrics } from '@/components/marketing/AnimatedMetrics'
 
 // Homepage Vitalcom v3 — máximo impacto visual + SEO + conversión
 // Keywords: productos de bienestar, dropshipping Colombia, vender sin inversión,
@@ -59,7 +60,7 @@ export default function HomePage() {
       >
         <div className="flex items-center gap-3">
           <Image
-            src="/assets/branding/imagen vitalcom.jpeg"
+            src="/assets/branding/logo-vitalcom.jpeg"
             alt="Vitalcom — Plataforma de bienestar"
             width={40}
             height={40}
@@ -164,7 +165,7 @@ export default function HomePage() {
             }}
           >
             <Image
-              src="/assets/branding/imagen vitalcom.jpeg"
+              src="/assets/branding/logo-vitalcom.jpeg"
               alt="Vitalcom — Productos de bienestar en Latinoamérica"
               width={150}
               height={150}
@@ -340,57 +341,9 @@ export default function HomePage() {
       </section>
 
       {/* ══════════════════════════════════════════════════
-          MÉTRICAS — Números que impactan
+          MÉTRICAS — Contadores animados con partículas
          ══════════════════════════════════════════════════ */}
-      <section
-        className="relative z-10 overflow-hidden py-20"
-        style={{
-          background: 'linear-gradient(180deg, rgba(198,255,60,0.03) 0%, transparent 100%)',
-          borderTop: '1px solid rgba(198, 255, 60, 0.06)',
-          borderBottom: '1px solid rgba(198, 255, 60, 0.06)',
-        }}
-        aria-label="Estadísticas de Vitalcom"
-      >
-        <div className="vc-scan-line" />
-        <div className="relative mx-auto grid max-w-5xl grid-cols-2 gap-8 px-6 md:grid-cols-4 md:gap-12">
-          {[
-            { value: '1.500+', label: 'Emprendedores activos', icon: Users },
-            { value: '4', label: 'Países en LATAM', icon: TrendingUp },
-            { value: '140+', label: 'Productos premium', icon: ShoppingBag },
-            { value: '50K+', label: 'Pedidos entregados', icon: CheckCircle },
-          ].map((m, i) => {
-            const Icon = m.icon
-            return (
-              <div key={m.label} className={`text-center vc-count-in`} style={{ animationDelay: `${i * 0.15}s` }}>
-                <div
-                  className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl"
-                  style={{
-                    background: 'rgba(198, 255, 60, 0.08)',
-                    border: '1px solid rgba(198, 255, 60, 0.2)',
-                  }}
-                >
-                  <Icon size={22} color="var(--vc-lime-main)" />
-                </div>
-                <p
-                  className="vc-text-gradient text-3xl font-black md:text-5xl"
-                  style={{ fontFamily: 'var(--font-display)' }}
-                >
-                  {m.value}
-                </p>
-                <p
-                  className="mt-2 text-xs uppercase tracking-wider"
-                  style={{
-                    color: 'var(--vc-white-dim)',
-                    fontFamily: 'var(--font-heading)',
-                  }}
-                >
-                  {m.label}
-                </p>
-              </div>
-            )
-          })}
-        </div>
-      </section>
+      <AnimatedMetrics />
 
       {/* ══════════════════════════════════════════════════
           COMUNIDAD — El corazón de Vitalcom
@@ -904,7 +857,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-8">
           <div className="flex items-center gap-3">
             <Image
-              src="/assets/branding/imagen vitalcom.jpeg"
+              src="/assets/branding/logo-vitalcom.jpeg"
               alt="Vitalcom"
               width={32}
               height={32}
