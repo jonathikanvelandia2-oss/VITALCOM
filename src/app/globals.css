@@ -1,0 +1,232 @@
+@import 'tailwindcss';
+
+/* ─────────────────────────────────────────────────────────
+   VITALCOM — Tokens de marca
+   Verde lima neón sobre negro profundo (tech-natural)
+   ───────────────────────────────────────────────────────── */
+@theme {
+  /* Verdes lima — color dominante */
+  --color-vc-lime-main: #c6ff3c;
+  --color-vc-lime-electric: #a8ff00;
+  --color-vc-lime-glow: #dfff80;
+  --color-vc-lime-soft: #e8ffb3;
+  --color-vc-lime-deep: #7fb800;
+  --color-vc-lime-dark: #4a6b00;
+
+  /* Negros y grises */
+  --color-vc-black: #0a0a0a;
+  --color-vc-black-mid: #141414;
+  --color-vc-black-soft: #1f1f1f;
+  --color-vc-gray-dark: #2a2a2a;
+  --color-vc-gray-mid: #4a4a4a;
+
+  /* Neutros */
+  --color-vc-white: #ffffff;
+  --color-vc-white-soft: #f5f5f5;
+  --color-vc-white-dim: #b8b8b8;
+
+  /* Estados */
+  --color-vc-success: #c6ff3c;
+  --color-vc-warning: #ffb800;
+  --color-vc-error: #ff4757;
+  --color-vc-info: #3cc6ff;
+
+  /* Fuentes */
+  --font-display: 'Orbitron', sans-serif;
+  --font-heading: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+:root {
+  /* Aliases para compatibilidad con var(--vc-*) en CSS suelto */
+  --vc-lime-main: #c6ff3c;
+  --vc-lime-electric: #a8ff00;
+  --vc-lime-glow: #dfff80;
+  --vc-lime-soft: #e8ffb3;
+  --vc-lime-deep: #7fb800;
+  --vc-lime-dark: #4a6b00;
+
+  --vc-black: #0a0a0a;
+  --vc-black-mid: #141414;
+  --vc-black-soft: #1f1f1f;
+  --vc-gray-dark: #2a2a2a;
+  --vc-gray-mid: #4a4a4a;
+
+  --vc-white: #ffffff;
+  --vc-white-soft: #f5f5f5;
+  --vc-white-dim: #b8b8b8;
+
+  --vc-glow-lime: rgba(198, 255, 60, 0.4);
+  --vc-glow-strong: rgba(168, 255, 0, 0.65);
+  --vc-glow-white: rgba(255, 255, 255, 0.08);
+
+  --vc-gradient-primary: linear-gradient(135deg, #a8ff00 0%, #c6ff3c 50%, #dfff80 100%);
+  --vc-gradient-dark: linear-gradient(135deg, #0a0a0a 0%, #1f1f1f 50%, #2a2a2a 100%);
+  --vc-gradient-hero: linear-gradient(180deg, #0a0a0a 0%, #141414 60%, #1f1f1f 100%);
+  --vc-gradient-glow: radial-gradient(circle at center, rgba(198, 255, 60, 0.25) 0%, transparent 70%);
+}
+
+/* Reset / base */
+* {
+  border-color: var(--vc-gray-dark);
+}
+
+html {
+  background: var(--vc-black);
+  color: var(--vc-white-soft);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--vc-black);
+  color: var(--vc-white-soft);
+  min-height: 100vh;
+}
+
+/* Selección de texto en verde lima */
+::selection {
+  background: var(--vc-lime-main);
+  color: var(--vc-black);
+}
+
+/* Scrollbar tematizado */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--vc-black-mid);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--vc-gray-dark);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--vc-lime-deep);
+}
+
+/* ─────────────────────────────────────────────────────────
+   Animaciones de marca
+   ───────────────────────────────────────────────────────── */
+@keyframes vc-pulse {
+  0%, 100% { box-shadow: 0 0 20px var(--vc-glow-lime); }
+  50%      { box-shadow: 0 0 40px var(--vc-glow-strong); }
+}
+
+@keyframes vc-float-glow {
+  0%, 100% { transform: translateY(0); box-shadow: 0 0 20px var(--vc-glow-lime); }
+  50%      { transform: translateY(-2px); box-shadow: 0 0 30px var(--vc-glow-strong); }
+}
+
+@keyframes vc-reveal {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.vc-pulse { animation: vc-pulse 2.5s ease-in-out infinite; }
+.vc-float-glow { animation: vc-float-glow 3s ease-in-out infinite; }
+.vc-reveal { animation: vc-reveal 0.8s ease-out forwards; opacity: 0; }
+
+/* Stagger para grupos de cards */
+.vc-reveal-d1 { animation: vc-reveal 0.8s ease-out 0.1s forwards; opacity: 0; }
+.vc-reveal-d2 { animation: vc-reveal 0.8s ease-out 0.2s forwards; opacity: 0; }
+.vc-reveal-d3 { animation: vc-reveal 0.8s ease-out 0.3s forwards; opacity: 0; }
+.vc-reveal-d4 { animation: vc-reveal 0.8s ease-out 0.4s forwards; opacity: 0; }
+.vc-reveal-d5 { animation: vc-reveal 0.8s ease-out 0.5s forwards; opacity: 0; }
+.vc-reveal-d6 { animation: vc-reveal 0.8s ease-out 0.6s forwards; opacity: 0; }
+
+/* Texto con gradiente lima */
+.vc-text-gradient {
+  background: var(--vc-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Gradiente de texto animado */
+@keyframes vc-gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.vc-text-gradient-animated {
+  background: linear-gradient(90deg, #a8ff00, #c6ff3c, #dfff80, #c6ff3c, #a8ff00);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: vc-gradient-shift 4s ease infinite;
+}
+
+/* Orbe flotante lento */
+@keyframes vc-orbit {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25%      { transform: translate(30px, -20px) scale(1.05); }
+  50%      { transform: translate(-10px, -40px) scale(0.95); }
+  75%      { transform: translate(-30px, 10px) scale(1.02); }
+}
+.vc-orbit { animation: vc-orbit 20s ease-in-out infinite; }
+.vc-orbit-reverse { animation: vc-orbit 25s ease-in-out infinite reverse; }
+
+/* Borde gradiente animado */
+@keyframes vc-border-glow {
+  0%, 100% { border-color: rgba(198, 255, 60, 0.2); box-shadow: 0 0 20px rgba(198,255,60,0.08); }
+  50%      { border-color: rgba(198, 255, 60, 0.5); box-shadow: 0 0 40px rgba(198,255,60,0.2); }
+}
+.vc-border-glow { animation: vc-border-glow 3s ease-in-out infinite; }
+
+/* Contador fade-in arriba */
+@keyframes vc-count-in {
+  from { opacity: 0; transform: translateY(30px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.vc-count-in { animation: vc-count-in 1s ease-out forwards; opacity: 0; }
+
+/* Línea scan */
+@keyframes vc-scan {
+  0%   { left: -100%; }
+  100% { left: 200%; }
+}
+.vc-scan-line {
+  position: absolute;
+  top: 0; width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(198,255,60,0.06), transparent);
+  animation: vc-scan 6s ease-in-out infinite;
+}
+
+/* Botón primario Vitalcom */
+.vc-btn-primary {
+  background: var(--vc-lime-main);
+  color: var(--vc-black);
+  box-shadow: 0 0 24px var(--vc-glow-lime), 0 4px 16px rgba(168, 255, 0, 0.25);
+  border: 1px solid rgba(223, 255, 128, 0.4);
+  border-radius: 10px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.75rem 1.5rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+.vc-btn-primary:hover {
+  background: var(--vc-lime-electric);
+  box-shadow: 0 0 40px var(--vc-glow-strong);
+  transform: translateY(-1px);
+}
+
+/* Card Vitalcom */
+.vc-card {
+  background: var(--vc-black-mid);
+  border: 1px solid rgba(198, 255, 60, 0.15);
+  border-radius: 14px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+.vc-card:hover {
+  border-color: rgba(198, 255, 60, 0.5);
+  box-shadow: 0 0 24px var(--vc-glow-lime);
+}

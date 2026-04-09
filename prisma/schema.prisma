@@ -1,0 +1,302 @@
+// Vitalcom — Schema Prisma inicial
+// Multi-rol + Multi-país (CO/EC/GT/CL)
+// Ver CLAUDE.md sección "Schema de base de datos" para contexto completo
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────
+
+enum UserRole {
+  SUPERADMIN
+  ADMIN
+  MANAGER_AREA
+  EMPLOYEE
+  COMMUNITY
+  DROPSHIPPER
+}
+
+enum Country {
+  CO
+  EC
+  GT
+  CL
+}
+
+enum Area {
+  VENTAS
+  LOGISTICA
+  MARKETING
+  SOPORTE
+  FINANZAS
+  DIRECCION
+  PRODUCTO
+  COMUNIDAD
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  DISPATCHED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum OrderSource {
+  DIRECT
+  ZENDU
+  COMMUNITY
+  DROPSHIPPER
+}
+
+// ─────────────────────────────────────────────────────────
+// USUARIOS Y AUTH
+// ─────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String?
+  role          UserRole  @default(COMMUNITY)
+  country       Country?
+  area          Area?
+  avatar        String?
+  phone         String?
+  whatsapp      String?
+
+  // Comunidad / gamificación
+  level         Int       @default(1)
+  points        Int       @default(0)
+  bio           String?
+
+  // Estado
+  active        Boolean   @default(true)
+  verified      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relaciones
+  posts            Post[]
+  comments         Comment[]
+  inboxSent        InboxMessage[]      @relation("MessageSender")
+  inboxReceived    InboxMessage[]      @relation("MessageReceiver")
+  orders           Order[]
+  pricingCalcs     PricingCalculation[]
+  workflows        WorkflowTemplate[]
+  courseProgress   CourseProgress[]
+}
+
+// ─────────────────────────────────────────────────────────
+// CATÁLOGO
+// ─────────────────────────────────────────────────────────
+
+model Product {
+  id             String      @id @default(cuid())
+  sku            String      @unique
+  name           String
+  slug           String      @unique
+  description    String?
+  category       String?
+  subcategory    String?
+  images         String[]
+  basePrice      Float
+  suggestedPrice Float
+  weight         Float?
+  dimensions     Json?
+  active         Boolean     @default(true)
+  bestseller     Boolean     @default(false)
+  salesCount     Int         @default(0)
+
+  stock          Stock[]
+  orderItems     OrderItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Stock {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  country    Country
+  quantity   Int      @default(0)
+  warehouse  String?
+  updatedAt  DateTime @updatedAt
+
+  @@unique([productId, country])
+}
+
+// ─────────────────────────────────────────────────────────
+// PEDIDOS
+// ─────────────────────────────────────────────────────────
+
+model Order {
+  id              String      @id @default(cuid())
+  number          String      @unique
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id])
+  source          OrderSource
+  country         Country
+  status          OrderStatus @default(PENDING)
+
+  customerName    String
+  customerEmail   String
+  customerPhone   String?
+  customerAddress String?
+
+  items           OrderItem[]
+  subtotal        Float
+  shipping        Float
+  total           Float
+
+  trackingCode    String?
+  carrier         String?
+  notes           String?
+  externalRef     String?
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Float
+  total     Float
+}
+
+// ─────────────────────────────────────────────────────────
+// INBOX INTERNO (entre áreas)
+// ─────────────────────────────────────────────────────────
+
+model InboxThread {
+  id        String         @id @default(cuid())
+  subject   String
+  area      Area
+  priority  String         @default("normal")
+  resolved  Boolean        @default(false)
+  messages  InboxMessage[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model InboxMessage {
+  id          String      @id @default(cuid())
+  threadId    String
+  thread      InboxThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User        @relation("MessageSender", fields: [senderId], references: [id])
+  receiverId  String?
+  receiver    User?       @relation("MessageReceiver", fields: [receiverId], references: [id])
+  body        String
+  attachments String[]
+  read        Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+}
+
+// ─────────────────────────────────────────────────────────
+// COMUNIDAD (estilo Skool)
+// ─────────────────────────────────────────────────────────
+
+model Post {
+  id        String    @id @default(cuid())
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id])
+  title     String?
+  body      String
+  images    String[]
+  category  String?
+  pinned    Boolean   @default(false)
+  likes     Int       @default(0)
+  comments  Comment[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  body      String
+  parentId  String?
+  likes     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Course {
+  id          String           @id @default(cuid())
+  title       String
+  slug        String           @unique
+  description String?
+  cover       String?
+  level       String
+  modules     Json
+  published   Boolean          @default(false)
+  order       Int              @default(0)
+  progress    CourseProgress[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model CourseProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id])
+  completedLessons String[]
+  percentage  Int      @default(0)
+  completed   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, courseId])
+}
+
+// ─────────────────────────────────────────────────────────
+// HERRAMIENTAS DE COMUNIDAD
+// ─────────────────────────────────────────────────────────
+
+model PricingCalculation {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  productName String
+  basePrice   Float
+  shipping    Float
+  margin      Float
+  finalPrice  Float
+  country     Country
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model WorkflowTemplate {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  name        String
+  description String?
+  category    String
+  steps       Json
+  isPublic    Boolean  @default(false)
+  uses        Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
