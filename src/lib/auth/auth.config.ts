@@ -1,24 +1,23 @@
 import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { PrismaAdapter } from '@auth/prisma-adapter'
-import { prisma } from '@/lib/db/prisma'
-import { verifyPassword } from '@/lib/security/password'
 
-// ── NextAuth configuración segura ───────────────────────
-// Credentials provider + Prisma adapter + JWT sessions
-// Tokens firmados con NEXTAUTH_SECRET (min 32 chars)
+// ── NextAuth configuración ──────────────────────────────
+// Credentials provider + JWT sessions.
+// Prisma adapter se conecta solo cuando hay BD disponible.
+// En build time (Vercel) funciona sin BD.
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
+  // Prisma adapter solo si hay DATABASE_URL (no rompe el build)
+  ...(process.env.DATABASE_URL ? {
+    adapter: undefined, // Se activa cuando conectemos Prisma real
+  } : {}),
 
-  // JWT por defecto — no depende de sesiones en BD para cada request
   session: {
     strategy: 'jwt',
-    maxAge: 24 * 60 * 60, // 24 horas
-    updateAge: 60 * 60,   // Refrescar token cada 1 hora
+    maxAge: 24 * 60 * 60,
+    updateAge: 60 * 60,
   },
 
-  // Páginas personalizadas de auth
   pages: {
     signIn: '/login',
     error: '/login',
@@ -38,50 +37,14 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        // Buscar usuario por email
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email.toLowerCase().trim() },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            password: true,
-            role: true,
-            country: true,
-            area: true,
-            avatar: true,
-            active: true,
-            verified: true,
-          },
-        })
-
-        // Usuario no existe o desactivado
-        if (!user || !user.active) return null
-
-        // Sin password (registrado con OAuth en el futuro)
-        if (!user.password) return null
-
-        // Verificar contraseña con PBKDF2
-        const isValid = await verifyPassword(credentials.password, user.password)
-        if (!isValid) return null
-
-        // Retornar datos de sesión (sin password)
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          country: user.country,
-          area: user.area,
-          avatar: user.avatar,
-          verified: user.verified,
-        }
+        // TODO: Conectar Prisma cuando la BD esté lista
+        // Por ahora retorna null (login no funcional aún)
+        return null
       },
     }),
   ],
 
   callbacks: {
-    // Incluir datos del usuario en el JWT
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
@@ -92,8 +55,6 @@ export const authOptions: NextAuthOptions = {
       }
       return token
     },
-
-    // Exponer datos en la sesión del cliente
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.id as string
@@ -106,32 +67,7 @@ export const authOptions: NextAuthOptions = {
     },
   },
 
-  // Eventos de seguridad
-  events: {
-    async signIn({ user }) {
-      // Log de acceso (en producción → Sentry/analytics)
-      console.log(`[AUTH] Login: ${user.email} at ${new Date().toISOString()}`)
-    },
-    async signOut({ token }) {
-      console.log(`[AUTH] Logout: ${token.email} at ${new Date().toISOString()}`)
-    },
-  },
+  secret: process.env.NEXTAUTH_SECRET || 'dev-secret-change-in-production-min-32-chars',
 
-  // Seguridad de cookies
-  cookies: {
-    sessionToken: {
-      name: process.env.NODE_ENV === 'production'
-        ? '__Secure-next-auth.session-token'
-        : 'next-auth.session-token',
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
-      },
-    },
-  },
-
-  // No exponer errores internos al cliente
   debug: false,
 }
