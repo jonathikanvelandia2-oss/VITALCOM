@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { Orbitron, Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google'
 import { CookieConsent } from '@/components/shared/CookieConsent'
-import { MatrixRain } from '@/components/marketing/MatrixRain'
 import './globals.css'
 
 // Fuentes oficiales Vitalcom (ver CLAUDE.md → Tipografía)
@@ -57,7 +56,6 @@ export default function RootLayout({
       className={`${orbitron.variable} ${spaceGrotesk.variable} ${inter.variable} ${jetbrains.variable}`}
     >
       <body>
-        <MatrixRain />
         {children}
         <CookieConsent />
       </body>
