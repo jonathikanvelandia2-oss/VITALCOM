@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { Package, ShoppingCart, Search, Star, Filter, TrendingUp } from 'lucide-react'
 import { CommunityTopbar } from '@/components/community/CommunityTopbar'
 import { CATALOG, CATEGORIES, getMargin, getCatalogStats } from '@/lib/catalog/products'
@@ -85,13 +86,17 @@ export default function CatalogoComunidadPage() {
               <article key={p.sku} className="vc-card group flex flex-col">
                 {/* Imagen placeholder */}
                 <div
-                  className="relative mb-4 flex h-36 items-center justify-center rounded-xl"
+                  className="relative mb-4 flex h-40 items-center justify-center overflow-hidden rounded-xl"
                   style={{
                     background: 'linear-gradient(135deg, rgba(198,255,60,0.08) 0%, rgba(168,255,0,0.15) 100%)',
                     border: '1px solid rgba(198, 255, 60, 0.15)',
                   }}
                 >
-                  <Package size={40} color="var(--vc-lime-main)" />
+                  {p.image ? (
+                    <Image src={p.image} alt={p.name} fill className="object-cover transition-transform duration-500 group-hover:scale-110" sizes="(max-width: 640px) 100vw, 33vw" />
+                  ) : (
+                    <Package size={40} color="var(--vc-lime-main)" />
+                  )}
                   {p.bestseller && (
                     <span className="absolute left-3 top-3 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase" style={{ background: 'var(--vc-lime-main)', color: 'var(--vc-black)' }}>
                       Bestseller
