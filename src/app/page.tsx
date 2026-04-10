@@ -23,6 +23,20 @@ import { AnimatedMetrics } from '@/components/marketing/AnimatedMetrics'
 export default function HomePage() {
   return (
     <main className="relative min-h-screen overflow-hidden">
+      {/* ── MATRIX RAIN — CSS puro, sin JS ── */}
+      <div className="vc-matrix-rain pointer-events-none absolute inset-0 z-[1] overflow-hidden" aria-hidden="true">
+        <div className="vc-matrix-col" style={{ left: '5%', animationDuration: '18s', animationDelay: '0s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
+        <div className="vc-matrix-col" style={{ left: '12%', animationDuration: '22s', animationDelay: '-4s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
+        <div className="vc-matrix-col" style={{ left: '20%', animationDuration: '16s', animationDelay: '-8s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
+        <div className="vc-matrix-col" style={{ left: '30%', animationDuration: '24s', animationDelay: '-2s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
+        <div className="vc-matrix-col" style={{ left: '40%', animationDuration: '20s', animationDelay: '-10s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
+        <div className="vc-matrix-col" style={{ left: '50%', animationDuration: '17s', animationDelay: '-6s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
+        <div className="vc-matrix-col" style={{ left: '60%', animationDuration: '23s', animationDelay: '-12s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
+        <div className="vc-matrix-col" style={{ left: '70%', animationDuration: '19s', animationDelay: '-3s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
+        <div className="vc-matrix-col" style={{ left: '80%', animationDuration: '21s', animationDelay: '-7s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
+        <div className="vc-matrix-col" style={{ left: '90%', animationDuration: '25s', animationDelay: '-14s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
+      </div>
+
       {/* ── FONDOS AMBIENTALES DINÁMICOS ── */}
       <div
         className="pointer-events-none absolute inset-0"
@@ -148,32 +162,41 @@ export default function HomePage() {
           </span>
         </div>
 
-        {/* Logo con doble anillo */}
-        <div className="vc-reveal-d1 relative mb-10">
-          {/* Anillo exterior animado */}
+        {/* Logo 3D efecto moneda */}
+        <div className="vc-reveal-d1 relative mb-10" style={{ perspective: '800px' }}>
+          {/* Anillo exterior pulsante */}
           <div
-            className="absolute -inset-4 rounded-full vc-pulse"
+            className="absolute -inset-6 rounded-full vc-pulse"
+            style={{ border: '1px solid rgba(198, 255, 60, 0.15)' }}
+          />
+          {/* Segundo anillo */}
+          <div
+            className="absolute -inset-3 rounded-full"
             style={{
-              border: '1px solid rgba(198, 255, 60, 0.2)',
+              border: '1px solid rgba(198, 255, 60, 0.3)',
+              animation: 'vc-pulse 2.5s ease-in-out infinite 0.5s',
             }}
           />
+          {/* Glow detrás */}
           <div
-            className="relative"
+            className="absolute inset-0 rounded-full"
             style={{
-              boxShadow: '0 0 60px var(--vc-glow-lime), 0 0 120px rgba(198,255,60,0.2)',
-              borderRadius: '50%',
+              boxShadow: '0 0 80px var(--vc-glow-lime), 0 0 160px rgba(198,255,60,0.2), 0 0 240px rgba(198,255,60,0.08)',
             }}
-          >
-            <Image
-              src="/assets/branding/logo-vitalcom.jpeg"
-              alt="Vitalcom — Productos de bienestar en Latinoamérica"
-              width={150}
-              height={150}
-              className="rounded-full"
-              style={{ border: '2px solid rgba(198, 255, 60, 0.5)' }}
-              priority
-            />
-          </div>
+          />
+          {/* Logo con flip 3D */}
+          <Image
+            src="/assets/branding/logo-vitalcom.jpeg"
+            alt="Vitalcom — Productos de bienestar en Latinoamérica"
+            width={160}
+            height={160}
+            className="relative rounded-full vc-coin-logo"
+            style={{
+              border: '2px solid rgba(198, 255, 60, 0.5)',
+              boxShadow: '0 0 40px var(--vc-glow-lime)',
+            }}
+            priority
+          />
         </div>
 
         {/* Headline principal — SEO H1 */}
