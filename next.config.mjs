@@ -15,17 +15,6 @@ const nextConfig = {
     serverActions: { bodySizeLimit: '5mb' },
   },
 
-  // ── FIX: Desactivar caché de webpack en desarrollo ────
-  // Causa raíz de errores "Cannot find module './682.js'",
-  // "__webpack_modules__[moduleId] is not a function", y CSS roto.
-  // En producción se mantiene activo para builds rápidos.
-  webpack: (config, { dev }) => {
-    if (dev) {
-      config.cache = false
-    }
-    return config
-  },
-
   // ── Headers de seguridad — SOLO en producción ─────────
   async headers() {
     if (!isProd) return []

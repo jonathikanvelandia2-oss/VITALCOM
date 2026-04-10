@@ -4,9 +4,8 @@
   "private": true,
   "description": "Vitalcom Platform — SaaS administrativo + plataforma comunitaria para proveeduría de bienestar (CO/EC/GT/CL)",
   "scripts": {
-    "predev": "rimraf .next",
     "dev": "next dev",
-    "build": "rimraf .next && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "clean": "rimraf .next node_modules/.cache",
