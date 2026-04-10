@@ -7,6 +7,7 @@ import type { NextRequest } from 'next/server'
 // La variable NODE_ENV la setea Next.js automáticamente.
 
 const IS_DEV = process.env.NODE_ENV !== 'production'
+const IS_TESTING = process.env.NEXT_PUBLIC_TESTING_MODE === 'true'
 
 // Rutas protegidas (solo en producción)
 const PROTECTED_ROUTES = [
@@ -27,7 +28,7 @@ export function middleware(request: NextRequest) {
   // ════════════════════════════════════════════════════════
   // DESARROLLO — no bloquear nada, navegar libremente
   // ════════════════════════════════════════════════════════
-  if (IS_DEV) {
+  if (IS_DEV || IS_TESTING) {
     return NextResponse.next()
   }
 
