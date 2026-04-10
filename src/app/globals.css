@@ -236,37 +236,6 @@ body {
   100% { opacity: 0; transform: scale(1.5); }
 }
 
-/* ── Matrix rain — CSS puro, cero JS ─────────────────── */
-@keyframes vc-matrix-fall {
-  0%   { transform: translateY(-100%); }
-  100% { transform: translateY(100vh); }
-}
-.vc-matrix-rain {
-  opacity: 1;
-}
-.vc-matrix-col {
-  position: absolute;
-  top: 0;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.3em;
-  color: var(--vc-lime-deep);
-  opacity: 0.04;
-  white-space: nowrap;
-  animation: vc-matrix-fall linear infinite;
-  user-select: none;
-}
-.vc-matrix-col:nth-child(odd) {
-  opacity: 0.03;
-  color: var(--vc-lime-main);
-}
-.vc-matrix-col:nth-child(3n) {
-  opacity: 0.06;
-  font-size: 10px;
-}
 
 /* Botón primario Vitalcom */
 .vc-btn-primary {

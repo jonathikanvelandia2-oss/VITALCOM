@@ -23,20 +23,6 @@ import { AnimatedMetrics } from '@/components/marketing/AnimatedMetrics'
 export default function HomePage() {
   return (
     <main className="relative min-h-screen overflow-hidden">
-      {/* ── MATRIX RAIN — CSS puro, sin JS ── */}
-      <div className="vc-matrix-rain pointer-events-none absolute inset-0 z-[1] overflow-hidden" aria-hidden="true">
-        <div className="vc-matrix-col" style={{ left: '5%', animationDuration: '18s', animationDelay: '0s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
-        <div className="vc-matrix-col" style={{ left: '12%', animationDuration: '22s', animationDelay: '-4s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
-        <div className="vc-matrix-col" style={{ left: '20%', animationDuration: '16s', animationDelay: '-8s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
-        <div className="vc-matrix-col" style={{ left: '30%', animationDuration: '24s', animationDelay: '-2s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
-        <div className="vc-matrix-col" style={{ left: '40%', animationDuration: '20s', animationDelay: '-10s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
-        <div className="vc-matrix-col" style={{ left: '50%', animationDuration: '17s', animationDelay: '-6s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
-        <div className="vc-matrix-col" style={{ left: '60%', animationDuration: '23s', animationDelay: '-12s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
-        <div className="vc-matrix-col" style={{ left: '70%', animationDuration: '19s', animationDelay: '-3s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
-        <div className="vc-matrix-col" style={{ left: '80%', animationDuration: '21s', animationDelay: '-7s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
-        <div className="vc-matrix-col" style={{ left: '90%', animationDuration: '25s', animationDelay: '-14s' }}>VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM·VITALCOM</div>
-      </div>
-
       {/* ── FONDOS AMBIENTALES DINÁMICOS ── */}
       <div
         className="pointer-events-none absolute inset-0"
