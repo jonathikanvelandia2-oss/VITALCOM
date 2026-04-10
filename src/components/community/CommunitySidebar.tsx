@@ -17,6 +17,7 @@ import {
   Zap,
   CheckSquare,
   Megaphone,
+  Video,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 
@@ -29,6 +30,7 @@ const NAV = [
   { href: '/automatizaciones', label: 'Automatizaciones', icon: Zap },
   { href: '/tareas', label: 'Tareas', icon: CheckSquare },
   { href: '/cursos', label: 'Cursos', icon: GraduationCap },
+  { href: '/reuniones', label: 'Reuniones', icon: Video },
   { href: '/eventos', label: 'Eventos', icon: Calendar },
   { href: '/herramientas/calculadora', label: 'Calculadora', icon: Calculator },
   { href: '/herramientas/flujos', label: 'Flujos Luzitbot', icon: Workflow },
