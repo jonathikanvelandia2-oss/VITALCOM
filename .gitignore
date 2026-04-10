@@ -40,6 +40,11 @@ next-env.d.ts
 # prisma
 prisma/migrations/dev.db*
 
+# docs y assets pesados (referencia local, no van al repo)
+docs/
+*.zip
+*.skill
+
 # logs
 logs
 *.log
