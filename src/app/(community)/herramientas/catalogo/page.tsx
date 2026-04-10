@@ -40,8 +40,8 @@ export default function CatalogoComunidadPage() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <MiniStat label="Productos" value={stats.totalProducts} />
           <MiniStat label="Bestsellers" value={stats.totalBestsellers} />
-          <MiniStat label="Rating promedio" value={stats.avgRating} />
-          <MiniStat label="Bajo stock" value={stats.lowStock} warning />
+          <MiniStat label="Precio prom. comunidad" value={`$${(stats.avgCommunityPrice / 1000).toFixed(0)}K`} />
+          <MiniStat label="Categorías" value={stats.categories} />
         </div>
 
         {/* Búsqueda y filtros */}
@@ -117,49 +117,42 @@ export default function CatalogoComunidadPage() {
                   {p.name}
                 </h3>
 
-                {/* Descripción */}
-                <p className="mb-3 text-[11px] leading-relaxed" style={{ color: 'var(--vc-white-dim)' }}>
-                  {p.description}
-                </p>
-
-                {/* Rating y vendidos */}
-                <div className="mb-3 flex items-center gap-3 text-[11px]" style={{ color: 'var(--vc-white-dim)' }}>
-                  <span className="flex items-center gap-1">
-                    <Star size={11} fill="var(--vc-lime-main)" color="var(--vc-lime-main)" /> {p.rating}
-                  </span>
-                  <span>{p.sold.toLocaleString('es-CO')} vendidos</span>
-                  <span
-                    className="rounded-full px-2 py-0.5 text-[9px] font-bold"
-                    style={{
-                      background: p.stockCO < 50 ? 'rgba(255,71,87,0.12)' : 'rgba(198,255,60,0.08)',
-                      color: p.stockCO < 50 ? 'var(--vc-error)' : 'var(--vc-lime-main)',
-                    }}
-                  >
-                    {p.stockCO} en stock
-                  </span>
+                {/* Tags */}
+                <div className="mb-3 flex flex-wrap gap-1">
+                  {p.tags.slice(0, 3).map(t => (
+                    <span key={t} className="rounded-full px-2 py-0.5 text-[9px]" style={{ background: 'var(--vc-black-soft)', color: 'var(--vc-white-dim)' }}>
+                      {t}
+                    </span>
+                  ))}
                 </div>
 
-                {/* Precios */}
+                {/* Precios — 3 niveles reales */}
                 <div className="mt-auto space-y-3">
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <p className="text-[10px] uppercase" style={{ color: 'var(--vc-gray-mid)' }}>Tu costo</p>
-                      <p className="font-mono text-sm font-bold" style={{ color: 'var(--vc-white-soft)' }}>
-                        $ {p.basePrice.toLocaleString('es-CO')}
+                  <div className="grid grid-cols-3 gap-2 rounded-lg p-2" style={{ background: 'var(--vc-black-soft)' }}>
+                    <div className="text-center">
+                      <p className="text-[9px] uppercase" style={{ color: 'var(--vc-gray-mid)' }}>Comunidad</p>
+                      <p className="font-mono text-sm font-bold" style={{ color: 'var(--vc-lime-main)' }}>
+                        $ {p.precioComunidad.toLocaleString('es-CO')}
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-[10px] uppercase" style={{ color: 'var(--vc-gray-mid)' }}>Ganancia</p>
-                      <p className="font-mono text-sm font-bold" style={{ color: 'var(--vc-lime-main)' }}>
-                        $ {margin.value.toLocaleString('es-CO')}
+                      <p className="text-[9px] uppercase" style={{ color: 'var(--vc-gray-mid)' }}>Privado</p>
+                      <p className="font-mono text-sm font-bold" style={{ color: 'var(--vc-white-soft)' }}>
+                        $ {p.precioPrivado.toLocaleString('es-CO')}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[10px] uppercase" style={{ color: 'var(--vc-gray-mid)' }}>Sugerido</p>
-                      <p className="font-mono text-base font-bold" style={{ color: 'var(--vc-lime-main)' }}>
-                        $ {p.suggestedPrice.toLocaleString('es-CO')}
+                    <div className="text-center">
+                      <p className="text-[9px] uppercase" style={{ color: 'var(--vc-gray-mid)' }}>Público</p>
+                      <p className="font-mono text-sm font-bold" style={{ color: 'var(--vc-white-dim)' }}>
+                        $ {p.precioPublico.toLocaleString('es-CO')}
                       </p>
                     </div>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span style={{ color: 'var(--vc-white-dim)' }}>Tu ganancia:</span>
+                    <span className="font-mono font-bold" style={{ color: 'var(--vc-lime-main)' }}>
+                      $ {margin.value.toLocaleString('es-CO')} ({margin.percent}%)
+                    </span>
                   </div>
                   <button className="vc-btn-primary flex w-full items-center justify-center gap-2 text-xs">
                     <ShoppingCart size={14} /> Agregar a mi tienda
@@ -174,7 +167,7 @@ export default function CatalogoComunidadPage() {
   )
 }
 
-function MiniStat({ label, value, warning }: { label: string; value: number; warning?: boolean }) {
+function MiniStat({ label, value, warning }: { label: string; value: number | string; warning?: boolean }) {
   return (
     <div className="vc-card text-center" style={{ padding: '0.75rem' }}>
       <p className="text-xl font-black" style={{ color: warning ? 'var(--vc-warning)' : 'var(--vc-lime-main)', fontFamily: 'var(--font-display)' }}>{value}</p>
