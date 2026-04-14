@@ -5,49 +5,89 @@ import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, BarChart3,
   Target, ArrowUpRight, ArrowDownRight, Sparkles, RefreshCw,
   Package, Users, Percent, AlertTriangle, CheckCircle2, Lightbulb,
-  Calendar,
+  Loader2,
 } from 'lucide-react'
 import { CommunityTopbar } from '@/components/community/CommunityTopbar'
-import { MOCK_METRICS, MOCK_STORE, formatCOP } from '@/lib/integrations/shopify'
+import { useMyStores, useStoreMetrics } from '@/hooks/useShopify'
 
-// ── Rendimiento — Dashboard de métricas de tu tienda ─────
-// Analítica de ventas, productos top, tendencias y
-// recomendaciones IA para mejorar resultados.
+// ── Rendimiento — Dashboard de métricas reales ──────────
 
 type Period = '7d' | '30d' | '90d'
+const PERIOD_DAYS: Record<Period, number> = { '7d': 7, '30d': 30, '90d': 90 }
+
+function formatCOP(value: number): string {
+  return `$ ${Math.round(value).toLocaleString('es-CO')}`
+}
 
 export default function RendimientoPage() {
-  const [period, setPeriod] = useState<Period>('7d')
-  const metrics = MOCK_METRICS
+  const [period, setPeriod] = useState<Period>('30d')
+  const { data: storesData, isLoading: storesLoading } = useMyStores()
+  const stores = storesData?.stores ?? []
+  const activeStore = stores[0] ?? null
 
-  // Cálculos derivados
-  const profitMargin = ((metrics.totalProfit / metrics.totalRevenue) * 100).toFixed(1)
-  const ordersDelivered = metrics.ordersByStatus.delivered || 0
-  const totalProcessed = metrics.totalOrders - (metrics.ordersByStatus.cancelled || 0)
-  const deliveryRate = ((ordersDelivered / totalProcessed) * 100).toFixed(1)
+  const { data: metricsData, isLoading: metricsLoading } = useStoreMetrics(
+    activeStore?.id ?? null,
+    PERIOD_DAYS[period]
+  )
+
+  const isLoading = storesLoading || metricsLoading
+
+  if (isLoading) {
+    return (
+      <>
+        <CommunityTopbar title="Rendimiento" subtitle="Cargando métricas..." />
+        <div className="flex flex-1 items-center justify-center py-20">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--vc-lime-main)' }} />
+        </div>
+      </>
+    )
+  }
+
+  if (!activeStore) {
+    return (
+      <>
+        <CommunityTopbar title="Rendimiento" subtitle="Conecta tu tienda para ver métricas" />
+        <div className="flex flex-1 items-center justify-center py-20">
+          <div className="text-center">
+            <BarChart3 size={48} color="var(--vc-gray-dark)" className="mx-auto mb-4" />
+            <p className="text-sm" style={{ color: 'var(--vc-gray-mid)' }}>No tienes tiendas conectadas</p>
+            <a href="/mi-tienda" className="vc-btn-primary mt-4 inline-flex items-center gap-2 text-xs">
+              Conectar tienda
+            </a>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  const summary = metricsData?.summary ?? { totalRevenue: 0, totalProfit: 0, totalOrders: 0, avgOrderValue: 0, syncedProducts: 0, conversionRate: 0, returnRate: 0 }
+  const topProducts = metricsData?.topProducts ?? []
+  const ordersByStatus = metricsData?.ordersByStatus ?? {}
+  const revenueByDay = metricsData?.revenueByDay ?? []
+
+  const profitMargin = summary.totalRevenue > 0
+    ? ((summary.totalProfit / summary.totalRevenue) * 100).toFixed(1)
+    : '0'
 
   return (
     <>
       <CommunityTopbar
         title="Rendimiento"
-        subtitle={`${MOCK_STORE.storeName} · Métricas en tiempo real`}
+        subtitle={`${activeStore.storeName} · Métricas en tiempo real`}
       />
       <div className="flex-1 space-y-6 p-4 md:p-6">
         {/* Periodo selector */}
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
             {(['7d', '30d', '90d'] as Period[]).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
+              <button key={p} onClick={() => setPeriod(p)}
                 className="rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all"
                 style={{
                   background: period === p ? 'var(--vc-lime-main)' : 'var(--vc-black-mid)',
                   color: period === p ? 'var(--vc-black)' : 'var(--vc-white-dim)',
                   border: period === p ? 'none' : '1px solid var(--vc-gray-dark)',
                   fontFamily: 'var(--font-heading)',
-                }}
-              >
+                }}>
                 {p === '7d' ? '7 días' : p === '30d' ? '30 días' : '90 días'}
               </button>
             ))}
@@ -59,50 +99,54 @@ export default function RendimientoPage() {
 
         {/* KPIs principales */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <BigKpi label="Ingresos" value={formatCOP(metrics.totalRevenue)} change={12.5} icon={DollarSign} />
-          <BigKpi label="Ganancia neta" value={formatCOP(metrics.totalProfit)} change={8.3} icon={TrendingUp} highlight />
-          <BigKpi label="Pedidos" value={metrics.totalOrders} change={15.2} icon={ShoppingCart} />
-          <BigKpi label="Ticket promedio" value={formatCOP(metrics.avgOrderValue)} change={-2.1} icon={Target} />
+          <BigKpi label="Ingresos" value={formatCOP(summary.totalRevenue)} icon={DollarSign} />
+          <BigKpi label="Ganancia neta" value={formatCOP(summary.totalProfit)} icon={TrendingUp} highlight />
+          <BigKpi label="Pedidos" value={summary.totalOrders} icon={ShoppingCart} />
+          <BigKpi label="Ticket promedio" value={formatCOP(summary.avgOrderValue)} icon={Target} />
         </div>
 
-        {/* Segunda fila de métricas */}
+        {/* Segunda fila */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <MiniMetric label="Margen de ganancia" value={`${profitMargin}%`} icon={Percent} status="good" />
-          <MiniMetric label="Tasa de conversión" value={`${metrics.conversionRate}%`} icon={Users} status={metrics.conversionRate > 2.5 ? 'good' : 'warning'} />
-          <MiniMetric label="Tasa de devolución" value={`${metrics.returnRate}%`} icon={Package} status={metrics.returnRate < 10 ? 'good' : 'warning'} />
-          <MiniMetric label="Tasa de entrega" value={`${deliveryRate}%`} icon={CheckCircle2} status={Number(deliveryRate) > 85 ? 'good' : 'warning'} />
+          <MiniMetric label="Productos sincronizados" value={String(summary.syncedProducts)} icon={Package} status="good" />
+          <MiniMetric label="Tasa de entrega" value={`${summary.conversionRate}%`} icon={CheckCircle2} status={summary.conversionRate > 50 ? 'good' : 'warning'} />
+          <MiniMetric label="Tasa de devolución" value={`${summary.returnRate}%`} icon={AlertTriangle} status={summary.returnRate < 15 ? 'good' : 'warning'} />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Gráfico de ingresos (barras simples) */}
+          {/* Gráfico de ingresos */}
           <div className="vc-card">
             <h3 className="mb-4 text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
-              Ingresos últimos 7 días
+              Ingresos por día
             </h3>
-            <div className="flex items-end gap-2" style={{ height: 160 }}>
-              {metrics.revenueByDay.map((day) => {
-                const maxRevenue = Math.max(...metrics.revenueByDay.map(d => d.revenue))
-                const height = (day.revenue / maxRevenue) * 100
-                return (
-                  <div key={day.date} className="flex flex-1 flex-col items-center gap-1">
-                    <p className="text-[8px] font-bold" style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}>
-                      {(day.revenue / 1000).toFixed(0)}K
-                    </p>
-                    <div className="w-full rounded-t-md transition-all"
-                      style={{
-                        height: `${height}%`,
-                        background: 'var(--vc-gradient-primary)',
-                        boxShadow: '0 0 12px var(--vc-glow-lime)',
-                        minHeight: 8,
-                      }}
-                    />
-                    <p className="text-[8px]" style={{ color: 'var(--vc-gray-mid)' }}>
-                      {new Date(day.date).toLocaleDateString('es-CO', { weekday: 'short' })}
-                    </p>
-                  </div>
-                )
-              })}
-            </div>
+            {revenueByDay.length === 0 ? (
+              <p className="py-8 text-center text-xs" style={{ color: 'var(--vc-gray-mid)' }}>Sin datos para este periodo</p>
+            ) : (
+              <div className="flex items-end gap-2" style={{ height: 160 }}>
+                {revenueByDay.map((day: any) => {
+                  const maxRevenue = Math.max(...revenueByDay.map((d: any) => d.revenue), 1)
+                  const height = Math.max(5, (day.revenue / maxRevenue) * 100)
+                  return (
+                    <div key={day.date} className="flex flex-1 flex-col items-center gap-1">
+                      <p className="text-[8px] font-bold" style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}>
+                        {day.revenue > 0 ? `${(day.revenue / 1000).toFixed(0)}K` : ''}
+                      </p>
+                      <div className="w-full rounded-t-md transition-all"
+                        style={{
+                          height: `${height}%`,
+                          background: 'var(--vc-gradient-primary)',
+                          boxShadow: '0 0 12px var(--vc-glow-lime)',
+                          minHeight: 4,
+                        }}
+                        title={`${formatCOP(day.revenue)} — ${day.orders} pedidos`} />
+                      <p className="text-[8px]" style={{ color: 'var(--vc-gray-mid)' }}>
+                        {new Date(day.date + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'short' })}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Estado de pedidos */}
@@ -110,68 +154,66 @@ export default function RendimientoPage() {
             <h3 className="mb-4 text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
               Estado de pedidos
             </h3>
-            <div className="space-y-3">
-              {Object.entries(metrics.ordersByStatus).map(([status, count]) => {
-                const total = metrics.totalOrders
-                const pct = ((count / total) * 100).toFixed(0)
-                const colors: Record<string, string> = {
-                  pending: 'var(--vc-warning)',
-                  confirmed: 'var(--vc-info)',
-                  processing: 'var(--vc-lime-main)',
-                  shipped: 'var(--vc-lime-electric)',
-                  delivered: 'var(--vc-lime-deep)',
-                  cancelled: 'var(--vc-error)',
-                }
-                const labels: Record<string, string> = {
-                  pending: 'Pendientes',
-                  confirmed: 'Confirmados',
-                  processing: 'Procesando',
-                  shipped: 'Enviados',
-                  delivered: 'Entregados',
-                  cancelled: 'Cancelados',
-                }
-                return (
-                  <div key={status}>
-                    <div className="mb-1 flex items-center justify-between text-[10px]">
-                      <span style={{ color: 'var(--vc-white-dim)' }}>{labels[status] || status}</span>
-                      <span style={{ color: colors[status], fontFamily: 'var(--font-mono)' }}>{count} ({pct}%)</span>
+            {Object.keys(ordersByStatus).length === 0 ? (
+              <p className="py-8 text-center text-xs" style={{ color: 'var(--vc-gray-mid)' }}>Sin pedidos en este periodo</p>
+            ) : (
+              <div className="space-y-3">
+                {Object.entries(ordersByStatus).map(([status, count]: [string, any]) => {
+                  const total = summary.totalOrders || 1
+                  const pct = ((count / total) * 100).toFixed(0)
+                  const colors: Record<string, string> = {
+                    PENDING: 'var(--vc-warning)', CONFIRMED: 'var(--vc-info)', PROCESSING: 'var(--vc-lime-main)',
+                    DISPATCHED: 'var(--vc-lime-electric)', DELIVERED: 'var(--vc-lime-deep)', CANCELLED: 'var(--vc-error)', RETURNED: 'var(--vc-error)',
+                  }
+                  const labels: Record<string, string> = {
+                    PENDING: 'Pendientes', CONFIRMED: 'Confirmados', PROCESSING: 'Procesando',
+                    DISPATCHED: 'Despachados', DELIVERED: 'Entregados', CANCELLED: 'Cancelados', RETURNED: 'Devueltos',
+                  }
+                  return (
+                    <div key={status}>
+                      <div className="mb-1 flex items-center justify-between text-[10px]">
+                        <span style={{ color: 'var(--vc-white-dim)' }}>{labels[status] || status}</span>
+                        <span style={{ color: colors[status] || 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>{count} ({pct}%)</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full" style={{ background: 'var(--vc-gray-dark)' }}>
+                        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: colors[status] || 'var(--vc-gray-mid)' }} />
+                      </div>
                     </div>
-                    <div className="h-1.5 overflow-hidden rounded-full" style={{ background: 'var(--vc-gray-dark)' }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: colors[status] }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Top productos */}
-        <div className="vc-card">
-          <h3 className="mb-4 text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
-            Top productos por ventas
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {metrics.topProducts.map((p, i) => (
-              <div key={p.name} className="rounded-lg p-3 text-center"
-                style={{ background: 'var(--vc-black-soft)', border: i === 0 ? '1px solid rgba(198,255,60,0.4)' : '1px solid var(--vc-gray-dark)' }}>
-                <span className="mb-1 inline-block text-lg font-black"
-                  style={{ color: i === 0 ? 'var(--vc-lime-main)' : 'var(--vc-white-dim)', fontFamily: 'var(--font-display)' }}>
-                  #{i + 1}
-                </span>
-                <p className="text-[11px] font-bold" style={{ color: 'var(--vc-white-soft)' }}>{p.name}</p>
-                <p className="text-[10px]" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>
-                  {p.sold} vendidos
-                </p>
-                <p className="mt-1 text-xs font-bold" style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}>
-                  {formatCOP(p.revenue)}
-                </p>
-              </div>
-            ))}
+        {topProducts.length > 0 && (
+          <div className="vc-card">
+            <h3 className="mb-4 text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
+              Top productos por ventas
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {topProducts.map((p: any, i: number) => (
+                <div key={p.name} className="rounded-lg p-3 text-center"
+                  style={{ background: 'var(--vc-black-soft)', border: i === 0 ? '1px solid rgba(198,255,60,0.4)' : '1px solid var(--vc-gray-dark)' }}>
+                  <span className="mb-1 inline-block text-lg font-black"
+                    style={{ color: i === 0 ? 'var(--vc-lime-main)' : 'var(--vc-white-dim)', fontFamily: 'var(--font-display)' }}>
+                    #{i + 1}
+                  </span>
+                  <p className="text-[11px] font-bold" style={{ color: 'var(--vc-white-soft)' }}>{p.name}</p>
+                  <p className="text-[10px]" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>
+                    {p.sold} vendidos
+                  </p>
+                  <p className="mt-1 text-xs font-bold" style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}>
+                    {formatCOP(p.revenue)}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Recomendaciones IA */}
+        {/* Recomendaciones */}
         <div className="vc-card" style={{ borderColor: 'rgba(198,255,60,0.3)' }}>
           <div className="mb-4 flex items-center gap-2">
             <Sparkles size={16} color="var(--vc-lime-main)" />
@@ -180,50 +222,22 @@ export default function RendimientoPage() {
             </h3>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <Recommendation
-              icon={TrendingUp}
-              title="Aumenta tu ticket promedio"
-              text="Tu ticket promedio es $43.3K. Agrega productos complementarios como Gummis Vitamina C junto al Colágeno Marino para bundles de $65K+."
-              priority="high"
-            />
-            <Recommendation
-              icon={Target}
-              title="Mejora tu conversión"
-              text="Tu tasa de conversión es 3.2%. Agrega testimonios de clientes reales y fotos de resultados. Los dropshippers con reseñas convierten 40% más."
-              priority="medium"
-            />
-            <Recommendation
-              icon={Package}
-              title="Reduce devoluciones"
-              text="Tu tasa de devolución (8.5%) está bien. Para bajarla más, envía un mensaje WhatsApp automático 24h antes de la entrega con instrucciones."
-              priority="low"
-            />
-            <Recommendation
-              icon={Lightbulb}
-              title="Producto estrella sin explotar"
-              text="El Ryze tiene margen del 45% y solo 22 ventas. Con su tendencia de hongos medicinales, podrías posicionarlo en TikTok con contenido educativo."
-              priority="high"
-            />
-          </div>
-        </div>
-
-        {/* Comparación con la comunidad */}
-        <div className="vc-card">
-          <h3 className="mb-4 text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
-            Tu rendimiento vs. la comunidad VITALCOMMERS
-          </h3>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <ComparisonMetric label="Ingresos mensuales" yours={formatCOP(4_850_000)} avg={formatCOP(2_800_000)} better />
-            <ComparisonMetric label="Pedidos mensuales" yours="112" avg="67" better />
-            <ComparisonMetric label="Tasa de devolución" yours="8.5%" avg="12.3%" better />
-          </div>
-          <div className="mt-4 rounded-lg p-3 text-center" style={{ background: 'rgba(198,255,60,0.08)', border: '1px solid rgba(198,255,60,0.2)' }}>
-            <p className="text-xs font-bold" style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-heading)' }}>
-              Estás en el TOP 15% de VITALCOMMERS por ingresos
-            </p>
-            <p className="mt-1 text-[10px]" style={{ color: 'var(--vc-white-dim)' }}>
-              Sigue así — a este ritmo llegarás a Nivel 5 (Rama) en 2 semanas
-            </p>
+            {summary.syncedProducts < 10 && (
+              <Recommendation icon={Package} title="Amplía tu catálogo"
+                text="Tienes pocos productos sincronizados. Importa al menos 10 productos del catálogo Vitalcom para ofrecer más variedad a tus clientes."
+                priority="high" />
+            )}
+            {summary.avgOrderValue > 0 && summary.avgOrderValue < 50000 && (
+              <Recommendation icon={TrendingUp} title="Aumenta tu ticket promedio"
+                text="Agrega productos complementarios y ofrece bundles para elevar el valor promedio de cada pedido."
+                priority="high" />
+            )}
+            <Recommendation icon={Target} title="Mejora tu conversión"
+              text="Agrega testimonios de clientes reales y fotos de resultados. Los dropshippers con reseñas convierten 40% más."
+              priority="medium" />
+            <Recommendation icon={Lightbulb} title="Contenido educativo"
+              text="Crea contenido en TikTok e Instagram sobre los beneficios de tus productos. El contenido educativo genera 3x más conversiones."
+              priority="medium" />
           </div>
         </div>
       </div>
@@ -231,12 +245,11 @@ export default function RendimientoPage() {
   )
 }
 
-// ── Componentes auxiliares ────────────────────────────────
+// ── Componentes auxiliares ───────────────────────────────
 
-function BigKpi({ label, value, change, icon: Icon, highlight }: {
-  label: string; value: string | number; change: number; icon: typeof DollarSign; highlight?: boolean
+function BigKpi({ label, value, icon: Icon, highlight }: {
+  label: string; value: string | number; icon: typeof DollarSign; highlight?: boolean
 }) {
-  const positive = change >= 0
   return (
     <div className="vc-card" style={{ padding: '1rem' }}>
       <div className="mb-2 flex items-center justify-between">
@@ -247,13 +260,6 @@ function BigKpi({ label, value, change, icon: Icon, highlight }: {
         style={{ color: highlight ? 'var(--vc-lime-main)' : 'var(--vc-white-soft)', fontFamily: 'var(--font-display)' }}>
         {value}
       </p>
-      <div className="mt-1 flex items-center gap-1">
-        {positive ? <ArrowUpRight size={11} color="var(--vc-lime-main)" /> : <ArrowDownRight size={11} color="var(--vc-error)" />}
-        <span className="text-[10px] font-bold" style={{ color: positive ? 'var(--vc-lime-main)' : 'var(--vc-error)' }}>
-          {positive ? '+' : ''}{change}%
-        </span>
-        <span className="text-[9px]" style={{ color: 'var(--vc-gray-mid)' }}>vs anterior</span>
-      </div>
     </div>
   )
 }
@@ -285,20 +291,6 @@ function Recommendation({ icon: Icon, title, text, priority }: {
         <p className="text-xs font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>{title}</p>
       </div>
       <p className="text-[11px] leading-relaxed" style={{ color: 'var(--vc-white-dim)' }}>{text}</p>
-    </div>
-  )
-}
-
-function ComparisonMetric({ label, yours, avg, better }: {
-  label: string; yours: string; avg: string; better: boolean
-}) {
-  return (
-    <div className="rounded-lg p-3 text-center" style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)' }}>
-      <p className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--vc-gray-mid)' }}>{label}</p>
-      <p className="mt-1 text-sm font-black" style={{ color: better ? 'var(--vc-lime-main)' : 'var(--vc-error)', fontFamily: 'var(--font-display)' }}>
-        {yours}
-      </p>
-      <p className="text-[9px]" style={{ color: 'var(--vc-gray-mid)' }}>Promedio comunidad: {avg}</p>
     </div>
   )
 }

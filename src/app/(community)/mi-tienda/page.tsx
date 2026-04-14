@@ -4,84 +4,114 @@ import { useState } from 'react'
 import Image from 'next/image'
 import {
   Store, Plus, ExternalLink, RefreshCw, Package, ShoppingCart,
-  ArrowRight, CheckCircle2, Circle, Sparkles, Globe, Palette,
+  ArrowRight, CheckCircle2, Circle, Sparkles, Globe,
   CreditCard, Upload, Link2, Rocket, TrendingUp, Clock, AlertCircle,
+  Loader2, X, Trash2,
 } from 'lucide-react'
 import { CommunityTopbar } from '@/components/community/CommunityTopbar'
 import {
-  MOCK_STORE, MOCK_SYNCED_PRODUCTS, MOCK_ORDERS,
+  useMyStores, useStoreDetail, useStoreSyncs, useStoreOrders,
+  useStoreMetrics, useConnectStore, useSyncProducts, useDisconnectStore,
+} from '@/hooks/useShopify'
+import {
   STORE_CREATION_GUIDE, STORE_TEMPLATES,
-  formatCOP, getStatusColor, getStatusLabel,
-  type ShopifyStore, type StoreTemplate,
+  getStatusColor, getStatusLabel,
+  type StoreTemplate,
 } from '@/lib/integrations/shopify'
 
 // ── Mi Tienda — Hub de gestión Shopify para VITALCOMMERS ─
-// Conectar, crear o gestionar tu tienda Shopify desde Vitalcom.
-// Sincronización de productos, pedidos y métricas en un solo lugar.
 
 type ViewMode = 'dashboard' | 'create' | 'products' | 'orders'
 
+function formatCOP(value: number): string {
+  return `$ ${value.toLocaleString('es-CO')}`
+}
+
 export default function MiTiendaPage() {
   const [view, setView] = useState<ViewMode>('dashboard')
-  const [hasStore] = useState(true) // false = mostrar flujo de creación
+  const { data, isLoading } = useMyStores()
+  const stores = data?.stores ?? []
+  const activeStore = stores[0] ?? null
 
-  if (!hasStore) {
-    return <CreateStoreView onConnect={() => {}} />
+  if (isLoading) {
+    return (
+      <>
+        <CommunityTopbar title="Mi Tienda" subtitle="Cargando..." />
+        <div className="flex flex-1 items-center justify-center py-20">
+          <Loader2 size={24} className="animate-spin" style={{ color: 'var(--vc-lime-main)' }} />
+        </div>
+      </>
+    )
+  }
+
+  if (!activeStore) {
+    return <CreateStoreView />
   }
 
   return (
     <>
       <CommunityTopbar
         title="Mi Tienda"
-        subtitle={`${MOCK_STORE.storeName} · ${MOCK_STORE.shopDomain}`}
+        subtitle={`${activeStore.storeName} · ${activeStore.shopDomain}`}
       />
       <div className="flex-1 space-y-6 p-4 md:p-6">
-        {/* Tabs de navegación */}
+        {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto">
           {([
             { key: 'dashboard', label: 'Resumen', icon: Store },
             { key: 'products', label: 'Productos sincronizados', icon: Package },
             { key: 'orders', label: 'Pedidos recientes', icon: ShoppingCart },
-            { key: 'create', label: 'Crear nueva tienda', icon: Plus },
+            { key: 'create', label: 'Nueva tienda', icon: Plus },
           ] as { key: ViewMode; label: string; icon: typeof Store }[]).map((tab) => {
             const Icon = tab.icon
             return (
-              <button
-                key={tab.key}
-                onClick={() => setView(tab.key)}
+              <button key={tab.key} onClick={() => setView(tab.key)}
                 className="flex shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold transition-all"
                 style={{
                   background: view === tab.key ? 'var(--vc-lime-main)' : 'var(--vc-black-mid)',
                   color: view === tab.key ? 'var(--vc-black)' : 'var(--vc-white-dim)',
                   border: view === tab.key ? 'none' : '1px solid var(--vc-gray-dark)',
                   fontFamily: 'var(--font-heading)',
-                }}
-              >
+                }}>
                 <Icon size={14} /> {tab.label}
               </button>
             )
           })}
         </div>
 
-        {view === 'dashboard' && <StoreDashboard store={MOCK_STORE} />}
-        {view === 'products' && <SyncedProducts />}
-        {view === 'orders' && <RecentOrders />}
-        {view === 'create' && <CreateStoreView onConnect={() => setView('dashboard')} />}
+        {view === 'dashboard' && <StoreDashboard storeId={activeStore.id} />}
+        {view === 'products' && <SyncedProducts storeId={activeStore.id} />}
+        {view === 'orders' && <RecentOrders storeId={activeStore.id} />}
+        {view === 'create' && <CreateStoreView />}
       </div>
     </>
   )
 }
 
-// ── Dashboard de la tienda conectada ─────────────────────
-function StoreDashboard({ store }: { store: ShopifyStore }) {
+// ── Dashboard ───────────────────────────────────────────
+function StoreDashboard({ storeId }: { storeId: string }) {
+  const { data, isLoading } = useStoreDetail(storeId)
+  const { data: metricsData } = useStoreMetrics(storeId, 30)
+
+  if (isLoading || !data) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={20} className="animate-spin" style={{ color: 'var(--vc-lime-main)' }} />
+      </div>
+    )
+  }
+
+  const { store, products, metrics } = data
+  const summary = metricsData?.summary
+
   return (
     <div className="space-y-6">
-      {/* KPIs rápidos */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <KpiCard label="Ingresos totales" value={formatCOP(store.totalRevenue)} icon={TrendingUp} highlight />
-        <KpiCard label="Productos Vitalcom" value={`${store.syncedProducts} / ${store.productsCount}`} icon={Package} />
-        <KpiCard label="Pedidos pendientes" value={store.pendingOrders} icon={Clock} warning={store.pendingOrders > 5} />
-        <KpiCard label="Última sincronización" value="Hace 6h" icon={RefreshCw} />
+        <KpiCard label="Ingresos totales" value={formatCOP(summary?.totalRevenue ?? metrics.totalRevenue)} icon={TrendingUp} highlight />
+        <KpiCard label="Productos Vitalcom" value={`${metrics.syncedCount} sync`} icon={Package} />
+        <KpiCard label="Ganancia neta" value={formatCOP(summary?.totalProfit ?? metrics.totalProfit)} icon={Sparkles} />
+        <KpiCard label="Última sync" value={store.lastSyncAt ? new Date(store.lastSyncAt).toLocaleDateString('es-CO') : 'Nunca'} icon={RefreshCw} />
       </div>
 
       {/* Estado de la tienda */}
@@ -91,64 +121,51 @@ function StoreDashboard({ store }: { store: ShopifyStore }) {
             Estado de tu tienda
           </h3>
           <span className="flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-bold uppercase"
-            style={{ background: 'rgba(198,255,60,0.15)', color: 'var(--vc-lime-main)' }}>
-            <span className="h-2 w-2 rounded-full" style={{ background: 'var(--vc-lime-main)', boxShadow: '0 0 8px var(--vc-glow-lime)' }} />
-            Activa
+            style={{ background: store.status === 'active' ? 'rgba(198,255,60,0.15)' : 'rgba(255,71,87,0.15)', color: store.status === 'active' ? 'var(--vc-lime-main)' : 'var(--vc-error)' }}>
+            <span className="h-2 w-2 rounded-full" style={{ background: store.status === 'active' ? 'var(--vc-lime-main)' : 'var(--vc-error)' }} />
+            {store.status === 'active' ? 'Activa' : store.status}
           </span>
         </div>
-
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-lg p-4" style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)' }}>
-            <p className="mb-1 text-[10px] uppercase tracking-wider" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>Dominio</p>
-            <p className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--vc-white-soft)' }}>
-              <Globe size={13} color="var(--vc-lime-main)" />
-              {store.shopDomain}
-            </p>
-          </div>
-          <div className="rounded-lg p-4" style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)' }}>
-            <p className="mb-1 text-[10px] uppercase tracking-wider" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>Plan</p>
-            <p className="text-xs font-semibold" style={{ color: 'var(--vc-white-soft)' }}>
-              Shopify {store.plan}
-            </p>
-          </div>
-          <div className="rounded-lg p-4" style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)' }}>
-            <p className="mb-1 text-[10px] uppercase tracking-wider" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>Conectada desde</p>
-            <p className="text-xs font-semibold" style={{ color: 'var(--vc-white-soft)' }}>
-              15 de marzo, 2026
-            </p>
-          </div>
+          <InfoBlock label="Dominio" value={store.shopDomain} icon={<Globe size={13} color="var(--vc-lime-main)" />} />
+          <InfoBlock label="Plan" value={`Shopify ${store.plan || 'Basic'}`} />
+          <InfoBlock label="Conectada desde" value={store.connectedAt ? new Date(store.connectedAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'} />
         </div>
       </div>
 
       {/* Top productos */}
-      <div className="vc-card">
-        <h3 className="mb-4 text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
-          Top 5 productos en tu tienda
-        </h3>
-        <div className="space-y-3">
-          {MOCK_SYNCED_PRODUCTS.map((p, i) => (
-            <div key={p.sku} className="flex items-center gap-4 rounded-lg p-3"
-              style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)' }}>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black"
-                style={{ background: i === 0 ? 'var(--vc-lime-main)' : 'var(--vc-black-mid)', color: i === 0 ? 'var(--vc-black)' : 'var(--vc-lime-main)', border: i !== 0 ? '1px solid var(--vc-gray-dark)' : 'none' }}>
-                {i + 1}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold" style={{ color: 'var(--vc-white-soft)' }}>{p.name}</p>
-                <p className="text-[10px]" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>{p.sku} · {p.soldTotal} vendidos</p>
+      {products.length > 0 && (
+        <div className="vc-card">
+          <h3 className="mb-4 text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
+            Top productos en tu tienda
+          </h3>
+          <div className="space-y-3">
+            {products.slice(0, 5).map((p: any, i: number) => (
+              <div key={p.id} className="flex items-center gap-4 rounded-lg p-3"
+                style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)' }}>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black"
+                  style={{ background: i === 0 ? 'var(--vc-lime-main)' : 'var(--vc-black-mid)', color: i === 0 ? 'var(--vc-black)' : 'var(--vc-lime-main)', border: i !== 0 ? '1px solid var(--vc-gray-dark)' : 'none' }}>
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold" style={{ color: 'var(--vc-white-soft)' }}>{p.name}</p>
+                  <p className="text-[10px]" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>
+                    {p.sku} · {p.soldTotal} vendidos
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold" style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}>
+                    {formatCOP(p.sellingPrice)}
+                  </p>
+                  <p className="text-[10px]" style={{ color: 'var(--vc-lime-deep)' }}>
+                    {p.margin}% margen
+                  </p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-xs font-bold" style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}>
-                  {formatCOP(p.sellingPrice)}
-                </p>
-                <p className="text-[10px]" style={{ color: 'var(--vc-lime-deep)' }}>
-                  {p.margin}% margen
-                </p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Acciones rápidas */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -160,119 +177,161 @@ function StoreDashboard({ store }: { store: ShopifyStore }) {
   )
 }
 
-// ── Productos sincronizados ──────────────────────────────
-function SyncedProducts() {
+// ── Productos sincronizados ─────────────────────────────
+function SyncedProducts({ storeId }: { storeId: string }) {
+  const { data, isLoading } = useStoreSyncs(storeId)
+  const products = data?.products ?? []
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={20} className="animate-spin" style={{ color: 'var(--vc-lime-main)' }} />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs" style={{ color: 'var(--vc-gray-mid)' }}>
-          {MOCK_SYNCED_PRODUCTS.length} productos sincronizados con tu Shopify
+          {products.length} productos sincronizados con tu Shopify
         </p>
         <button className="vc-btn-primary flex items-center gap-2 text-xs">
           <Plus size={14} /> Importar más
         </button>
       </div>
 
-      <div className="vc-card overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>
-              <th className="py-3">Producto</th>
-              <th className="py-3">Precio venta</th>
-              <th className="py-3">Costo Vitalcom</th>
-              <th className="py-3">Margen</th>
-              <th className="py-3">Vendidos</th>
-              <th className="py-3">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {MOCK_SYNCED_PRODUCTS.map((p) => (
-              <tr key={p.sku} className="text-xs" style={{ borderTop: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-dim)' }}>
-                <td className="py-4">
-                  <div>
-                    <p className="font-semibold" style={{ color: 'var(--vc-white-soft)' }}>{p.name}</p>
-                    <p className="text-[10px]" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>{p.sku}</p>
-                  </div>
-                </td>
-                <td className="py-4 font-mono" style={{ color: 'var(--vc-white-soft)' }}>{formatCOP(p.sellingPrice)}</td>
-                <td className="py-4 font-mono" style={{ color: 'var(--vc-lime-main)' }}>{formatCOP(p.costPrice)}</td>
-                <td className="py-4"><span className="font-mono font-bold" style={{ color: 'var(--vc-lime-main)' }}>{p.margin}%</span></td>
-                <td className="py-4 font-mono">{p.soldTotal}</td>
-                <td className="py-4">
-                  <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase"
-                    style={{ background: 'rgba(198,255,60,0.15)', color: 'var(--vc-lime-main)' }}>
-                    {p.status === 'active' ? 'Activo' : p.status}
-                  </span>
-                </td>
+      {products.length === 0 ? (
+        <div className="vc-card py-12 text-center">
+          <Package size={40} color="var(--vc-gray-dark)" className="mx-auto mb-3" />
+          <p className="text-sm" style={{ color: 'var(--vc-gray-mid)' }}>No hay productos sincronizados</p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--vc-white-dim)' }}>Importa productos del catálogo Vitalcom</p>
+        </div>
+      ) : (
+        <div className="vc-card overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>
+                <th className="py-3">Producto</th>
+                <th className="py-3">Precio venta</th>
+                <th className="py-3">Costo Vitalcom</th>
+                <th className="py-3">Margen</th>
+                <th className="py-3">Vendidos</th>
+                <th className="py-3">Estado</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {products.map((p: any) => (
+                <tr key={p.id} className="text-xs" style={{ borderTop: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-dim)' }}>
+                  <td className="py-4">
+                    <div>
+                      <p className="font-semibold" style={{ color: 'var(--vc-white-soft)' }}>{p.name}</p>
+                      <p className="text-[10px]" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>{p.sku}</p>
+                    </div>
+                  </td>
+                  <td className="py-4 font-mono" style={{ color: 'var(--vc-white-soft)' }}>{formatCOP(p.sellingPrice)}</td>
+                  <td className="py-4 font-mono" style={{ color: 'var(--vc-lime-main)' }}>{formatCOP(p.costPrice)}</td>
+                  <td className="py-4"><span className="font-mono font-bold" style={{ color: 'var(--vc-lime-main)' }}>{p.margin}%</span></td>
+                  <td className="py-4 font-mono">{p.soldTotal}</td>
+                  <td className="py-4">
+                    <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase"
+                      style={{ background: 'rgba(198,255,60,0.15)', color: 'var(--vc-lime-main)' }}>
+                      {p.status === 'active' ? 'Activo' : p.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
 
-// ── Pedidos recientes ────────────────────────────────────
-function RecentOrders() {
+// ── Pedidos recientes ───────────────────────────────────
+function RecentOrders({ storeId }: { storeId: string }) {
+  const { data, isLoading } = useStoreOrders(storeId)
+  const orders = data?.orders ?? []
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={20} className="animate-spin" style={{ color: 'var(--vc-lime-main)' }} />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs" style={{ color: 'var(--vc-gray-mid)' }}>
-          {MOCK_ORDERS.length} pedidos recientes de tu tienda Shopify
-        </p>
-      </div>
+      <p className="text-xs" style={{ color: 'var(--vc-gray-mid)' }}>
+        {orders.length} pedidos recientes de tu tienda Shopify
+      </p>
 
-      <div className="space-y-3">
-        {MOCK_ORDERS.map((order) => (
-          <div key={order.id} className="vc-card">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="mb-1 flex items-center gap-3">
-                  <span className="text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-mono)' }}>
-                    {order.orderNumber}
-                  </span>
-                  <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase"
-                    style={{ background: `${getStatusColor(order.status)}22`, color: getStatusColor(order.status) }}>
-                    {getStatusLabel(order.status)}
-                  </span>
-                  <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase"
-                    style={{ background: 'var(--vc-black-soft)', color: 'var(--vc-white-dim)', border: '1px solid var(--vc-gray-dark)' }}>
-                    {getStatusLabel(order.fulfillmentStatus)}
-                  </span>
-                </div>
-                <p className="text-xs" style={{ color: 'var(--vc-white-dim)' }}>
-                  {order.customerName} · {order.customerCity}
-                </p>
-                <p className="mt-1 text-[10px]" style={{ color: 'var(--vc-gray-mid)' }}>
-                  {order.items.map(i => `${i.name} x${i.qty}`).join(', ')}
-                </p>
-                {order.dropiTrackingCode && (
-                  <p className="mt-1 text-[10px]" style={{ color: 'var(--vc-info)', fontFamily: 'var(--font-mono)' }}>
-                    Dropi: {order.dropiTrackingCode}
+      {orders.length === 0 ? (
+        <div className="vc-card py-12 text-center">
+          <ShoppingCart size={40} color="var(--vc-gray-dark)" className="mx-auto mb-3" />
+          <p className="text-sm" style={{ color: 'var(--vc-gray-mid)' }}>No hay pedidos aún</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {orders.map((order: any) => (
+            <div key={order.id} className="vc-card">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="mb-1 flex items-center gap-3">
+                    <span className="text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-mono)' }}>
+                      {order.number}
+                    </span>
+                    <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase"
+                      style={{ background: `${getStatusColor(order.status.toLowerCase())}22`, color: getStatusColor(order.status.toLowerCase()) }}>
+                      {getStatusLabel(order.status.toLowerCase())}
+                    </span>
+                  </div>
+                  <p className="text-xs" style={{ color: 'var(--vc-white-dim)' }}>
+                    {order.customerName} · {order.customerCity}
                   </p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-mono)' }}>
-                  {formatCOP(order.total)}
-                </p>
-                <p className="text-[10px] font-bold" style={{ color: 'var(--vc-lime-main)' }}>
-                  Ganancia: {formatCOP(order.profit)}
-                </p>
+                  <p className="mt-1 text-[10px]" style={{ color: 'var(--vc-gray-mid)' }}>
+                    {order.items.map((i: any) => `${i.name} x${i.qty}`).join(', ')}
+                  </p>
+                  {order.trackingCode && (
+                    <p className="mt-1 text-[10px]" style={{ color: 'var(--vc-info)', fontFamily: 'var(--font-mono)' }}>
+                      Tracking: {order.trackingCode}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-mono)' }}>
+                    {formatCOP(order.total)}
+                  </p>
+                  <p className="text-[10px] font-bold" style={{ color: 'var(--vc-lime-main)' }}>
+                    Ganancia: {formatCOP(order.profit)}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-// ── Vista de creación de tienda ──────────────────────────
-function CreateStoreView({ onConnect }: { onConnect: () => void }) {
+// ── Vista de creación de tienda ─────────────────────────
+function CreateStoreView() {
   const [activeStep, setActiveStep] = useState(0)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [domain, setDomain] = useState('')
+  const [storeName, setStoreName] = useState('')
+  const connectStore = useConnectStore()
+
+  function handleConnect() {
+    if (!domain.includes('.myshopify.com')) return
+    connectStore.mutate(
+      { shopDomain: domain, storeName: storeName || domain.split('.')[0] },
+      { onSuccess: () => window.location.reload() }
+    )
+  }
 
   return (
     <>
@@ -281,7 +340,7 @@ function CreateStoreView({ onConnect }: { onConnect: () => void }) {
         subtitle="Te ayudamos a montar tu Shopify en menos de 1 hora"
       />
       <div className="flex-1 space-y-8 p-4 md:p-6">
-        {/* Hero motivacional */}
+        {/* Hero */}
         <div className="vc-card relative overflow-hidden" style={{ padding: '2rem' }}>
           <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full opacity-20"
             style={{ background: 'radial-gradient(circle, var(--vc-lime-main) 0%, transparent 70%)' }} />
@@ -311,7 +370,6 @@ function CreateStoreView({ onConnect }: { onConnect: () => void }) {
         </div>
 
         {showTemplates ? (
-          /* Plantillas de tienda */
           <div>
             <h3 className="mb-4 text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
               Elige una plantilla para empezar
@@ -323,7 +381,6 @@ function CreateStoreView({ onConnect }: { onConnect: () => void }) {
             </div>
           </div>
         ) : (
-          /* Guía paso a paso */
           <div>
             <h3 className="mb-4 text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
               6 pasos para tu tienda
@@ -334,22 +391,17 @@ function CreateStoreView({ onConnect }: { onConnect: () => void }) {
                 const isActive = i === activeStep
                 const isDone = i < activeStep
                 return (
-                  <div
-                    key={step.step}
-                    className="vc-card cursor-pointer transition-all"
+                  <div key={step.step} className="vc-card cursor-pointer transition-all"
                     onClick={() => setActiveStep(i)}
                     style={{
                       borderColor: isActive ? 'rgba(198,255,60,0.5)' : undefined,
                       boxShadow: isActive ? '0 0 20px var(--vc-glow-lime)' : 'none',
                       opacity: isDone ? 0.6 : 1,
-                    }}
-                  >
+                    }}>
                     <div className="flex items-start gap-4">
-                      <StepIcon
-                        size={22}
+                      <StepIcon size={22}
                         style={{ color: isDone ? 'var(--vc-lime-deep)' : isActive ? 'var(--vc-lime-main)' : 'var(--vc-gray-mid)' }}
-                        className="mt-0.5 shrink-0"
-                      />
+                        className="mt-0.5 shrink-0" />
                       <div className="flex-1">
                         <div className="flex items-center gap-3">
                           <span className="text-[10px] font-bold" style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}>
@@ -384,18 +436,27 @@ function CreateStoreView({ onConnect }: { onConnect: () => void }) {
             Conectar tienda existente
           </h3>
           <p className="mb-4 text-xs" style={{ color: 'var(--vc-white-dim)' }}>
-            Si ya tienes Shopify, pega tu dominio para conectarlo con Vitalcom y empezar a sincronizar productos.
+            Si ya tienes Shopify, pega tu dominio para conectarlo con Vitalcom.
           </p>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              placeholder="mi-tienda.myshopify.com"
-              className="flex-1 rounded-lg px-4 py-2.5 text-xs outline-none"
-              style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-soft)' }}
-            />
-            <button onClick={onConnect} className="vc-btn-primary flex items-center gap-2 text-xs">
-              <Link2 size={14} /> Conectar
-            </button>
+          <div className="space-y-3">
+            <input value={storeName} onChange={(e) => setStoreName(e.target.value)}
+              placeholder="Nombre de tu tienda"
+              className="w-full rounded-lg px-4 py-2.5 text-xs outline-none"
+              style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-soft)' }} />
+            <div className="flex gap-3">
+              <input value={domain} onChange={(e) => setDomain(e.target.value)}
+                placeholder="mi-tienda.myshopify.com"
+                className="flex-1 rounded-lg px-4 py-2.5 text-xs outline-none"
+                style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-soft)' }} />
+              <button onClick={handleConnect} disabled={connectStore.isPending || !domain.includes('.myshopify.com')}
+                className="vc-btn-primary flex items-center gap-2 text-xs">
+                {connectStore.isPending ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
+                Conectar
+              </button>
+            </div>
+            {connectStore.isError && (
+              <p className="text-xs" style={{ color: 'var(--vc-error)' }}>{(connectStore.error as Error).message}</p>
+            )}
           </div>
         </div>
       </div>
@@ -403,7 +464,7 @@ function CreateStoreView({ onConnect }: { onConnect: () => void }) {
   )
 }
 
-// ── Componentes auxiliares ────────────────────────────────
+// ── Componentes auxiliares ───────────────────────────────
 
 function KpiCard({ label, value, icon: Icon, highlight, warning }: {
   label: string; value: string | number; icon: typeof TrendingUp; highlight?: boolean; warning?: boolean
@@ -417,6 +478,17 @@ function KpiCard({ label, value, icon: Icon, highlight, warning }: {
       <p className="text-lg font-black"
         style={{ color: warning ? 'var(--vc-warning)' : highlight ? 'var(--vc-lime-main)' : 'var(--vc-white-soft)', fontFamily: 'var(--font-display)' }}>
         {value}
+      </p>
+    </div>
+  )
+}
+
+function InfoBlock({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
+  return (
+    <div className="rounded-lg p-4" style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)' }}>
+      <p className="mb-1 text-[10px] uppercase tracking-wider" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>{label}</p>
+      <p className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--vc-white-soft)' }}>
+        {icon} {value}
       </p>
     </div>
   )
