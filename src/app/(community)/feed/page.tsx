@@ -3,93 +3,44 @@
 import { useState } from 'react'
 import {
   Heart, MessageCircle, Share2, Sparkles, Image as ImageIcon,
-  Pin, TrendingUp, ShoppingBag, Award, Flame, Target,
-  ArrowUpRight, BookOpen,
+  Pin, TrendingUp, ShoppingBag, Award, Flame,
+  Loader2, Send,
 } from 'lucide-react'
 import { CommunityTopbar } from '@/components/community/CommunityTopbar'
-
-// ── Feed VITALCOMMERS — comunidad de dropshippers ────────
-// Contenido enfocado en: resultados reales, tips de venta,
-// casos de éxito, y aprendizaje colectivo.
-
-const POSTS = [
-  {
-    id: '1',
-    author: 'Juan Carlos · CEO Vitalcom',
-    level: 'Vital 🌳',
-    avatar: 'JC',
-    time: 'hace 2 h',
-    pinned: true,
-    category: 'anuncio',
-    body: '🚀 VITALCOMMERS: Ya pueden conectar su Shopify directamente desde la plataforma. Vayan a "Mi Tienda" en el menú. Los que no tienen tienda, hay plantillas listas para montar en 30 min. A vender.',
-    likes: 247,
-    comments: 58,
-    hasStats: false,
-  },
-  {
-    id: '2',
-    author: 'María Restrepo',
-    level: 'Tallo 🌱',
-    avatar: 'MR',
-    time: 'hace 4 h',
-    pinned: false,
-    category: 'resultado',
-    body: 'Semana 3 con Vitalcom. Resultados de esta semana con mi tienda de Shopify:\n\n• 23 pedidos facturados\n• 19 despachados (83% tasa de despacho)\n• $1.2M en ventas\n• $485K de ganancia neta\n\nEl Colágeno Marino sigue siendo el rey. La clave fue usar los textos del generador de marketing + historias con resultados reales de clientas.',
-    likes: 156,
-    comments: 34,
-    hasStats: true,
-    stats: { orders: 23, revenue: 1_200_000, profit: 485_000 },
-  },
-  {
-    id: '3',
-    author: 'Andrés Gómez',
-    level: 'Rama 🌿',
-    avatar: 'AG',
-    time: 'hace 7 h',
-    pinned: false,
-    category: 'tip',
-    body: 'TIP para los que venden en Instagram:\n\nNo pongan precio en las publicaciones. Pongan "Escríbeme DM" y usen el flujo de Luzitbot para responder automático.\n\nMi tasa de conversión subió de 2.1% a 4.8% con este cambio. El secreto es la conversación 1-a-1, no el catálogo.',
-    likes: 89,
-    comments: 22,
-    hasStats: false,
-  },
-  {
-    id: '4',
-    author: 'Verónica Salas',
-    level: 'Hoja 🍃',
-    avatar: 'VS',
-    time: 'ayer',
-    pinned: false,
-    category: 'pregunta',
-    body: 'Pregunta para los que ya conectaron Shopify: ¿cuál tema están usando? Empecé con Dawn pero siento que no se ve profesional para suplementos. ¿Sense es mejor?',
-    likes: 34,
-    comments: 18,
-    hasStats: false,
-  },
-  {
-    id: '5',
-    author: 'Carlos Duarte',
-    level: 'Árbol 🌳',
-    avatar: 'CD',
-    time: 'ayer',
-    pinned: false,
-    category: 'resultado',
-    body: 'Mes de marzo cerrado:\n\n• 112 pedidos · $4.85M en ventas\n• $2.14M de ganancia neta\n• TOP 15% de VITALCOMMERS\n\nLo que más me funcionó: meter Ryze y 12 Colágenos como bundle premium. El ticket promedio subió de $35K a $58K. Menos pedidos pero más rentables.',
-    likes: 213,
-    comments: 41,
-    hasStats: true,
-    stats: { orders: 112, revenue: 4_850_000, profit: 2_140_000 },
-  },
-]
+import { usePosts, useCreatePost, useToggleLike, useCreateComment } from '@/hooks/usePosts'
+import { useMyProfile } from '@/hooks/useCommunity'
+import { formatLevel } from '@/lib/gamification/points'
 
 const CATEGORIES = ['Todos', 'Resultados', 'Tips', 'Preguntas', 'Anuncios', 'Mindset', 'Ventas']
+const CATEGORY_MAP: Record<string, string> = {
+  Resultados: 'resultado', Tips: 'tip', Preguntas: 'pregunta',
+  Anuncios: 'anuncio', Mindset: 'mindset', Ventas: 'ventas',
+}
 
 export default function FeedPage() {
   const [activeCategory, setActiveCategory] = useState('Todos')
+  const [composerBody, setComposerBody] = useState('')
+  const [composerCategory, setComposerCategory] = useState<string>('general')
 
-  const filtered = activeCategory === 'Todos'
-    ? POSTS
-    : POSTS.filter(p => p.category.toLowerCase() === activeCategory.toLowerCase().replace('resultados', 'resultado').replace('preguntas', 'pregunta').replace('anuncios', 'anuncio'))
+  const categoryFilter = CATEGORY_MAP[activeCategory] as any
+  const { data, isLoading } = usePosts({ category: categoryFilter || undefined, limit: 20 })
+  const profile = useMyProfile()
+  const createPost = useCreatePost()
+
+  const posts = data?.posts ?? []
+  const total = data?.pagination?.total ?? 0
+
+  function handlePublish() {
+    if (!composerBody.trim()) return
+    createPost.mutate(
+      { body: composerBody, category: composerCategory as any, images: [] },
+      { onSuccess: () => { setComposerBody(''); setComposerCategory('general') } }
+    )
+  }
+
+  const initials = profile.data?.name
+    ? profile.data.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+    : '??'
 
   return (
     <>
@@ -99,48 +50,42 @@ export default function FeedPage() {
       />
       <div className="flex-1">
         <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-6">
-          {/* Resumen rápido de la comunidad */}
+          {/* Resumen rápido */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <QuickStat icon={ShoppingBag} label="Tiendas activas" value="347" />
-            <QuickStat icon={TrendingUp} label="Ventas hoy" value="$12.4M" highlight />
-            <QuickStat icon={Flame} label="Posts esta semana" value="89" />
-            <QuickStat icon={Award} label="Tu ranking" value="#142" />
+            <QuickStat icon={ShoppingBag} label="Posts totales" value={String(total)} />
+            <QuickStat icon={TrendingUp} label="Tu nivel" value={profile.data ? formatLevel(profile.data.level) : '—'} highlight />
+            <QuickStat icon={Flame} label="Tus puntos" value={profile.data?.points?.toLocaleString('es-CO') ?? '—'} />
+            <QuickStat icon={Award} label="Tu ranking" value={profile.data?.rankPosition ? `#${profile.data.rankPosition}` : '—'} />
           </div>
 
           {/* Composer */}
           <div className="vc-card">
             <div className="flex gap-3">
-              <div
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-bold"
-                style={{
-                  background: 'var(--vc-gradient-primary)',
-                  color: 'var(--vc-black)',
-                  fontFamily: 'var(--font-heading)',
-                }}
-              >
-                MR
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                style={{ background: 'var(--vc-gradient-primary)', color: 'var(--vc-black)', fontFamily: 'var(--font-heading)' }}>
+                {initials}
               </div>
               <div className="flex-1">
-                <textarea
+                <textarea value={composerBody} onChange={(e) => setComposerBody(e.target.value)}
                   placeholder="Comparte tu resultado, tip o pregunta con la comunidad..."
-                  rows={3}
-                  className="w-full resize-none rounded-lg p-3 text-sm outline-none"
-                  style={{
-                    background: 'var(--vc-black-soft)',
-                    border: '1px solid var(--vc-gray-dark)',
-                    color: 'var(--vc-white-soft)',
-                  }}
-                />
+                  rows={3} className="w-full resize-none rounded-lg p-3 text-sm outline-none"
+                  style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-soft)' }} />
                 <div className="mt-3 flex items-center justify-between">
-                  <div className="flex gap-3">
-                    <button className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vc-white-dim)' }}>
-                      <ImageIcon size={14} /> Imagen
-                    </button>
-                    <button className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--vc-white-dim)' }}>
-                      <TrendingUp size={14} /> Resultados
-                    </button>
+                  <div className="flex gap-2">
+                    <select value={composerCategory} onChange={(e) => setComposerCategory(e.target.value)}
+                      className="rounded-lg px-2 py-1 text-[11px] outline-none"
+                      style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-dim)' }}>
+                      <option value="general">General</option>
+                      <option value="resultado">Resultado</option>
+                      <option value="tip">Tip</option>
+                      <option value="pregunta">Pregunta</option>
+                      <option value="mindset">Mindset</option>
+                      <option value="ventas">Ventas</option>
+                    </select>
                   </div>
-                  <button className="vc-btn-primary" style={{ padding: '0.5rem 1.25rem' }}>
+                  <button onClick={handlePublish} disabled={createPost.isPending || !composerBody.trim()}
+                    className="vc-btn-primary flex items-center gap-1.5" style={{ padding: '0.5rem 1.25rem', opacity: composerBody.trim() ? 1 : 0.5 }}>
+                    {createPost.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                     Publicar
                   </button>
                 </div>
@@ -151,93 +96,35 @@ export default function FeedPage() {
           {/* Filtros */}
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((c) => (
-              <button
-                key={c}
-                onClick={() => setActiveCategory(c)}
+              <button key={c} onClick={() => setActiveCategory(c)}
                 className="rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider transition-all"
                 style={{
                   background: activeCategory === c ? 'var(--vc-lime-main)' : 'var(--vc-black-mid)',
                   color: activeCategory === c ? 'var(--vc-black)' : 'var(--vc-white-dim)',
                   border: activeCategory === c ? 'none' : '1px solid var(--vc-gray-dark)',
                   fontFamily: 'var(--font-heading)',
-                }}
-              >
+                }}>
                 {c}
               </button>
             ))}
           </div>
 
           {/* Posts */}
-          {filtered.map((p) => (
-            <article key={p.id} className="vc-card">
-              {p.pinned && (
-                <div className="-mt-2 mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider"
-                  style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}>
-                  <Pin size={11} /> Anclado por el equipo
-                </div>
-              )}
-              <header className="mb-3 flex items-center gap-3">
-                <div
-                  className="flex h-11 w-11 items-center justify-center rounded-full text-xs font-bold"
-                  style={{
-                    background: 'var(--vc-gradient-primary)',
-                    color: 'var(--vc-black)',
-                    fontFamily: 'var(--font-heading)',
-                  }}
-                >
-                  {p.avatar}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
-                    {p.author}
-                  </p>
-                  <p className="text-[11px]" style={{ color: 'var(--vc-lime-main)' }}>
-                    {p.level} · <span style={{ color: 'var(--vc-gray-mid)' }}>{p.time}</span>
-                  </p>
-                </div>
-                <CategoryBadge category={p.category} />
-              </header>
-
-              <div className="mb-4 whitespace-pre-line text-sm leading-relaxed" style={{ color: 'var(--vc-white-soft)' }}>
-                {p.body}
-              </div>
-
-              {/* Card de resultados si tiene stats */}
-              {p.hasStats && p.stats && (
-                <div className="mb-4 grid grid-cols-3 gap-2 rounded-lg p-3"
-                  style={{ background: 'rgba(198,255,60,0.06)', border: '1px solid rgba(198,255,60,0.2)' }}>
-                  <div className="text-center">
-                    <p className="text-[9px] uppercase" style={{ color: 'var(--vc-gray-mid)' }}>Pedidos</p>
-                    <p className="font-mono text-sm font-bold" style={{ color: 'var(--vc-white-soft)' }}>{p.stats.orders}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[9px] uppercase" style={{ color: 'var(--vc-gray-mid)' }}>Ventas</p>
-                    <p className="font-mono text-sm font-bold" style={{ color: 'var(--vc-lime-main)' }}>
-                      ${(p.stats.revenue / 1_000_000).toFixed(1)}M
-                    </p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[9px] uppercase" style={{ color: 'var(--vc-gray-mid)' }}>Ganancia</p>
-                    <p className="font-mono text-sm font-bold" style={{ color: 'var(--vc-lime-main)' }}>
-                      ${(p.stats.profit / 1000).toFixed(0)}K
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <footer className="flex items-center gap-6 pt-3 text-xs" style={{ borderTop: '1px solid var(--vc-gray-dark)' }}>
-                <button className="flex items-center gap-1.5 transition-colors hover:text-[--vc-lime-main]" style={{ color: 'var(--vc-white-dim)' }}>
-                  <Heart size={14} /> {p.likes}
-                </button>
-                <button className="flex items-center gap-1.5" style={{ color: 'var(--vc-white-dim)' }}>
-                  <MessageCircle size={14} /> {p.comments}
-                </button>
-                <button className="ml-auto flex items-center gap-1.5" style={{ color: 'var(--vc-white-dim)' }}>
-                  <Share2 size={14} /> Compartir
-                </button>
-              </footer>
-            </article>
-          ))}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 size={24} className="animate-spin" style={{ color: 'var(--vc-lime-main)' }} />
+            </div>
+          ) : posts.length === 0 ? (
+            <div className="vc-card py-12 text-center">
+              <p className="text-sm" style={{ color: 'var(--vc-gray-mid)' }}>
+                No hay posts {activeCategory !== 'Todos' ? `en la categoría "${activeCategory}"` : 'todavía'}. ¡Sé el primero!
+              </p>
+            </div>
+          ) : (
+            posts.map((p: any) => (
+              <PostCard key={p.id} post={p} />
+            ))
+          )}
 
           {/* CTA de la comunidad */}
           <div className="vc-card text-center" style={{ borderColor: 'rgba(198,255,60,0.3)' }}>
@@ -246,12 +133,108 @@ export default function FeedPage() {
               Comparte tus resultados y sube de nivel
             </h3>
             <p className="mx-auto mt-1 max-w-md text-[11px]" style={{ color: 'var(--vc-white-dim)' }}>
-              Cada post con resultados te da +10 puntos. Los tips útiles +5. Llega a Nivel 5 (Rama) y desbloquea herramientas Pro.
+              Cada post te da +10 puntos. Los comentarios +3. Llega a Nivel 5 (Rama) y desbloquea herramientas Pro.
             </p>
           </div>
         </div>
       </div>
     </>
+  )
+}
+
+// ── PostCard con like y comentarios ─────────────────────
+function PostCard({ post }: { post: any }) {
+  const toggleLike = useToggleLike()
+  const [showComments, setShowComments] = useState(false)
+  const [commentBody, setCommentBody] = useState('')
+  const createComment = useCreateComment(post.id)
+
+  const authorName = post.author?.name ?? 'Usuario'
+  const authorInitials = authorName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+  const levelLabel = formatLevel(post.author?.level ?? 1)
+  const timeAgo = getTimeAgo(post.createdAt)
+
+  function handleComment() {
+    if (!commentBody.trim()) return
+    createComment.mutate({ body: commentBody }, { onSuccess: () => setCommentBody('') })
+  }
+
+  return (
+    <article className="vc-card">
+      {post.pinned && (
+        <div className="-mt-2 mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider"
+          style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}>
+          <Pin size={11} /> Anclado por el equipo
+        </div>
+      )}
+      <header className="mb-3 flex items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full text-xs font-bold"
+          style={{ background: 'var(--vc-gradient-primary)', color: 'var(--vc-black)', fontFamily: 'var(--font-heading)' }}>
+          {authorInitials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
+            {authorName}
+          </p>
+          <p className="text-[11px]" style={{ color: 'var(--vc-lime-main)' }}>
+            {levelLabel} · <span style={{ color: 'var(--vc-gray-mid)' }}>{timeAgo}</span>
+          </p>
+        </div>
+        {post.category && <CategoryBadge category={post.category} />}
+      </header>
+
+      <div className="mb-4 whitespace-pre-line text-sm leading-relaxed" style={{ color: 'var(--vc-white-soft)' }}>
+        {post.body}
+      </div>
+
+      <footer className="flex items-center gap-6 pt-3 text-xs" style={{ borderTop: '1px solid var(--vc-gray-dark)' }}>
+        <button onClick={() => toggleLike.mutate(post.id)}
+          className="flex items-center gap-1.5 transition-colors hover:text-[--vc-lime-main]"
+          style={{ color: post.likedByMe ? 'var(--vc-lime-main)' : 'var(--vc-white-dim)' }}>
+          <Heart size={14} fill={post.likedByMe ? 'currentColor' : 'none'} /> {post.likes}
+        </button>
+        <button onClick={() => setShowComments(!showComments)}
+          className="flex items-center gap-1.5" style={{ color: 'var(--vc-white-dim)' }}>
+          <MessageCircle size={14} /> {post.commentCount}
+        </button>
+        <button className="ml-auto flex items-center gap-1.5" style={{ color: 'var(--vc-white-dim)' }}>
+          <Share2 size={14} /> Compartir
+        </button>
+      </footer>
+
+      {/* Sección de comentarios expandible */}
+      {showComments && (
+        <div className="mt-4 space-y-3 pt-3" style={{ borderTop: '1px solid var(--vc-gray-dark)' }}>
+          {post.comments?.map((c: any) => (
+            <div key={c.id} className="flex gap-2">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
+                style={{ background: 'var(--vc-black-soft)', color: 'var(--vc-lime-main)', border: '1px solid var(--vc-gray-dark)' }}>
+                {(c.author?.name ?? '??').split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+              </div>
+              <div>
+                <p className="text-[11px]">
+                  <span className="font-bold" style={{ color: 'var(--vc-white-soft)' }}>{c.author?.name}</span>
+                  <span className="ml-2" style={{ color: 'var(--vc-gray-mid)' }}>{getTimeAgo(c.createdAt)}</span>
+                </p>
+                <p className="text-xs" style={{ color: 'var(--vc-white-dim)' }}>{c.body}</p>
+              </div>
+            </div>
+          ))}
+          <div className="flex gap-2">
+            <input value={commentBody} onChange={(e) => setCommentBody(e.target.value)}
+              placeholder="Escribe un comentario..."
+              className="flex-1 rounded-lg px-3 py-2 text-xs outline-none"
+              style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-soft)' }}
+              onKeyDown={(e) => e.key === 'Enter' && handleComment()} />
+            <button onClick={handleComment} disabled={createComment.isPending || !commentBody.trim()}
+              className="rounded-lg px-3 py-2 text-xs font-bold"
+              style={{ background: 'rgba(198,255,60,0.12)', color: 'var(--vc-lime-main)' }}>
+              {createComment.isPending ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+            </button>
+          </div>
+        </div>
+      )}
+    </article>
   )
 }
 
@@ -279,12 +262,25 @@ function CategoryBadge({ category }: { category: string }) {
     pregunta: { bg: 'rgba(255,184,0,0.15)', color: 'var(--vc-warning)' },
     mindset: { bg: 'rgba(168,85,247,0.15)', color: '#a855f7' },
     ventas: { bg: 'rgba(198,255,60,0.1)', color: 'var(--vc-lime-deep)' },
+    general: { bg: 'rgba(255,255,255,0.08)', color: 'var(--vc-white-dim)' },
   }
-  const c = config[category] || config.tip
+  const c = config[category] || config.general
   return (
     <span className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase"
       style={{ background: c.bg, color: c.color, border: `1px solid ${c.color}33` }}>
       {category}
     </span>
   )
+}
+
+function getTimeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'ahora'
+  if (mins < 60) return `hace ${mins} min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `hace ${hours} h`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `hace ${days} d`
+  return new Date(dateStr).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
 }
