@@ -3,13 +3,22 @@ import { authOptions } from './auth.config'
 
 // ── Helpers de sesión para Server Components y API routes ──
 
+// Áreas operativas reales de Vitalcom
+export type VitalcomArea =
+  | 'DIRECCION'        // CEO — acceso total
+  | 'MARKETING'        // Campañas, contenido, comunidad
+  | 'COMERCIAL'        // Ventas, clientes, catálogo
+  | 'ADMINISTRATIVA'   // Operaciones, RRHH, procesos
+  | 'LOGISTICA'        // Stock, despachos, fulfillment Dropi
+  | 'CONTABILIDAD'     // Finanzas, facturación, liquidaciones
+
 export type UserSession = {
   id: string
   email: string
   name: string | null
   role: 'SUPERADMIN' | 'ADMIN' | 'MANAGER_AREA' | 'EMPLOYEE' | 'COMMUNITY' | 'DROPSHIPPER'
   country: 'CO' | 'EC' | 'GT' | 'CL' | null
-  area: string | null
+  area: VitalcomArea | null
   verified: boolean
 }
 

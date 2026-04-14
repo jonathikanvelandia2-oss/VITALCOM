@@ -1,12 +1,14 @@
 import { CommunitySidebar } from '@/components/community/CommunitySidebar'
+import { CommunityMobileNav } from '@/components/community/CommunityMobileNav'
 
-// Layout de la plataforma comunitaria Vitalcom
-// Sidebar fijo + área de contenido principal (feed, herramientas, cursos, etc.)
+// Layout de la plataforma comunitaria VITALCOMMERS
+// Sidebar fijo (desktop) + barra inferior (mobile) + contenido scrolleable
 export default function CommunityLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen" style={{ background: 'var(--vc-black)' }}>
       <CommunitySidebar />
-      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col pb-16 lg:pb-0">{children}</div>
+      <CommunityMobileNav />
     </div>
   )
 }
