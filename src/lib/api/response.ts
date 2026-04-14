@@ -28,11 +28,11 @@ export function apiError(message: string, status = 400, code?: string) {
 
 /** Wrapper que captura errores y retorna respuestas apropiadas */
 export function withErrorHandler(
-  handler: (req: Request) => Promise<NextResponse>
+  handler: (req: Request, ctx?: any) => Promise<NextResponse>
 ) {
-  return async (req: Request) => {
+  return async (req: Request, ctx?: any) => {
     try {
-      return await handler(req)
+      return await handler(req, ctx)
     } catch (error) {
       // Errores de validación Zod → 400 con detalle de campos
       if (error instanceof ZodError) {
