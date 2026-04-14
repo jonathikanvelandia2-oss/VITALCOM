@@ -7,7 +7,7 @@ import {
   GraduationCap,
   Calendar,
   Calculator,
-  Workflow,
+  BookOpen,
   Store,
   MessageSquare,
   User,
@@ -57,7 +57,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/automatizaciones', label: 'Automatizaciones', icon: Zap },
       { href: '/analitica', label: 'Analítica', icon: BarChart3 },
       { href: '/tareas', label: 'Tareas', icon: CheckSquare },
-      { href: '/herramientas/flujos', label: 'Flujos Luzitbot', icon: Workflow },
+      { href: '/recursos', label: 'Biblioteca', icon: BookOpen },
     ],
   },
 ]
