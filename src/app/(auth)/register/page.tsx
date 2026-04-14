@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {
   User, Mail, Lock, Phone, Sparkles, ChevronDown,
-  Shield, Globe, CheckCircle, Eye, EyeOff,
+  Shield, Globe, CheckCircle, Eye, EyeOff, AlertCircle,
 } from 'lucide-react'
 import { CountryFlag } from '@/components/shared/CountryFlag'
 
@@ -41,6 +41,8 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [phonePrefix, setPhonePrefix] = useState('+57')
   const [acceptTerms, setAcceptTerms] = useState(false)
+  const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -51,6 +53,7 @@ export default function RegisterPage() {
 
   function handleChange(field: keyof typeof form, value: string) {
     setForm((f) => ({ ...f, [field]: value }))
+    setFieldErrors((prev) => ({ ...prev, [field]: [] }))
   }
 
   function handlePrefixChange(prefix: string, code: string) {
@@ -58,11 +61,43 @@ export default function RegisterPage() {
     handleChange('country', code)
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!acceptTerms) return
     setLoading(true)
-    setTimeout(() => router.push('/feed'), 700)
+    setError('')
+    setFieldErrors({})
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          password: form.password,
+          confirmPassword: form.password,
+          whatsapp: form.phone ? `${phonePrefix}${form.phone}` : '',
+          acceptTerms: true,
+          acceptPrivacy: true,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        if (data.fieldErrors) setFieldErrors(data.fieldErrors)
+        setError(data.error || 'Error al crear la cuenta')
+        setLoading(false)
+        return
+      }
+
+      // Registro exitoso — redirigir a login
+      router.push('/login/comunidad?registered=true')
+    } catch {
+      setError('Error de conexión. Intenta de nuevo.')
+      setLoading(false)
+    }
   }
 
   // Fuerza de la contraseña
@@ -119,6 +154,14 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg p-3"
+              style={{ background: 'rgba(255,71,87,0.1)', border: '1px solid rgba(255,71,87,0.3)' }}>
+              <AlertCircle size={16} style={{ color: 'var(--vc-error)', flexShrink: 0 }} />
+              <p className="text-xs font-medium" style={{ color: 'var(--vc-error)' }}>{error}</p>
+            </div>
+          )}
+
           {/* Nombre */}
           <Field
             icon={<User size={16} />}

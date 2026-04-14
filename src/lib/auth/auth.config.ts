@@ -1,17 +1,13 @@
 import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import { prisma } from '@/lib/db/prisma'
+import { verifyPassword } from '@/lib/security/password'
 
 // ── NextAuth configuración ──────────────────────────────
 // Credentials provider + JWT sessions.
-// Prisma adapter se conecta solo cuando hay BD disponible.
-// En build time (Vercel) funciona sin BD.
+// authorize() busca en BD real y verifica password con PBKDF2.
 
 export const authOptions: NextAuthOptions = {
-  // Prisma adapter solo si hay DATABASE_URL (no rompe el build)
-  ...(process.env.DATABASE_URL ? {
-    adapter: undefined, // Se activa cuando conectemos Prisma real
-  } : {}),
-
   session: {
     strategy: 'jwt',
     maxAge: 24 * 60 * 60,
@@ -37,9 +33,31 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        // TODO: Conectar Prisma cuando la BD esté lista
-        // Por ahora retorna null (login no funcional aún)
-        return null
+        // Buscar usuario en BD
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email.toLowerCase().trim() },
+        })
+
+        if (!user || !user.password || !user.active) {
+          return null
+        }
+
+        // Verificar contraseña con PBKDF2
+        const valid = await verifyPassword(credentials.password, user.password)
+        if (!valid) {
+          return null
+        }
+
+        // Retornar datos para el token JWT
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          country: user.country,
+          area: user.area,
+          verified: user.verified,
+        }
       },
     }),
   ],

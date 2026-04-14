@@ -3,10 +3,11 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { signIn } from 'next-auth/react'
 import {
   Mail, Lock, Eye, EyeOff, Building2, Crown, Megaphone,
   ShoppingCart, FileText, Truck, Calculator, ArrowRight,
-  Shield, Users,
+  Shield, Users, AlertCircle,
 } from 'lucide-react'
 
 // ── Login Staff Vitalcom ─────────────────────────────────
@@ -72,13 +73,29 @@ export default function LoginEquipoPage() {
   const [area, setArea] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const selectedArea = AREAS.find(a => a.key === area)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setTimeout(() => router.push('/admin'), 600)
+    setError('')
+
+    const result = await signIn('credentials', {
+      email: email.toLowerCase().trim(),
+      password,
+      redirect: false,
+    })
+
+    if (result?.error) {
+      setError('Credenciales incorrectas o no tienes acceso de staff')
+      setLoading(false)
+      return
+    }
+
+    router.push('/admin')
+    router.refresh()
   }
 
   return (
@@ -160,6 +177,14 @@ export default function LoginEquipoPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg p-3"
+              style={{ background: 'rgba(255,71,87,0.1)', border: '1px solid rgba(255,71,87,0.3)' }}>
+              <AlertCircle size={16} style={{ color: 'var(--vc-error)', flexShrink: 0 }} />
+              <p className="text-xs font-medium" style={{ color: 'var(--vc-error)' }}>{error}</p>
+            </div>
+          )}
+
           <div>
             <label className="mb-2 block text-xs font-semibold uppercase tracking-wider"
               style={{ color: 'var(--vc-white-dim)', fontFamily: 'var(--font-heading)' }}>

@@ -3,22 +3,38 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { Mail, Lock, Eye, EyeOff, Users } from 'lucide-react'
+import { signIn } from 'next-auth/react'
+import { Mail, Lock, Eye, EyeOff, Users, AlertCircle } from 'lucide-react'
 
-// Login para miembros de la comunidad Vitalcom (1500 usuarios)
-// FRONTEND ONLY — la lógica real de auth se conecta en fase posterior
+// Login para miembros de la comunidad Vitalcom (1500+ VITALCOMMERS)
 export default function LoginComunidadPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  // Stub: redirige al feed de comunidad sin validar (mockup)
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setTimeout(() => router.push('/feed'), 600)
+    setError('')
+
+    const result = await signIn('credentials', {
+      email: email.toLowerCase().trim(),
+      password,
+      redirect: false,
+    })
+
+    if (result?.error) {
+      setError('Correo o contraseña incorrectos')
+      setLoading(false)
+      return
+    }
+
+    // Redirigir a feed de comunidad
+    router.push('/feed')
+    router.refresh()
   }
 
   return (
@@ -49,6 +65,14 @@ export default function LoginComunidadPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="flex items-center gap-2 rounded-lg p-3"
+              style={{ background: 'rgba(255,71,87,0.1)', border: '1px solid rgba(255,71,87,0.3)' }}>
+              <AlertCircle size={16} style={{ color: 'var(--vc-error)', flexShrink: 0 }} />
+              <p className="text-xs font-medium" style={{ color: 'var(--vc-error)' }}>{error}</p>
+            </div>
+          )}
+
           <Field
             icon={<Mail size={16} />}
             label="Correo electrónico"
