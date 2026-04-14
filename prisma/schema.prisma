@@ -95,6 +95,9 @@ model User {
   workflows        WorkflowTemplate[]
   courseProgress    CourseProgress[]
   shopifyStores    ShopifyStore[]
+  tasks            Task[]
+  meetings         Meeting[]
+  uploadedDocs     Document[]          @relation("UploadedDocs")
 }
 
 // ─────────────────────────────────────────────────────────
@@ -351,6 +354,65 @@ model ProductSync {
   createdAt          DateTime  @default(now())
 
   @@unique([shopifyStoreId, productId])
+}
+
+// ─────────────────────────────────────────────────────────
+// TAREAS, REUNIONES, RECURSOS (Comunidad)
+// ─────────────────────────────────────────────────────────
+
+model Task {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  title       String
+  description String?
+  status      String   @default("pending") // pending, in_progress, completed
+  priority    String   @default("medium")  // low, medium, high
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Meeting {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  title        String
+  description  String?
+  date         DateTime
+  duration     Int      @default(60) // minutos
+  link         String?               // URL de meet/zoom
+  type         String   @default("videocall") // videocall, presencial
+  status       String   @default("scheduled") // scheduled, completed, cancelled
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Resource {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  category    String                    // guias, plantillas, videos, ebooks
+  type        String   @default("file") // file, link, video
+  url         String                    // URL del archivo o enlace
+  thumbnail   String?
+  downloads   Int      @default(0)
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  name        String
+  folder      String   @default("general") // general, legal, marketing, logistica
+  type        String                       // pdf, excel, doc, imagen
+  url         String
+  size        Int      @default(0)          // bytes
+  uploadedBy  String
+  uploader    User     @relation("UploadedDocs", fields: [uploadedBy], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ─────────────────────────────────────────────────────────

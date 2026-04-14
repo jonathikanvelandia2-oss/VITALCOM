@@ -48,3 +48,5 @@ docs/
 # logs
 logs
 *.log
+
+.vercel

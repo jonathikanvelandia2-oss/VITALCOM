@@ -3,9 +3,10 @@
 import { useState, useMemo } from 'react'
 import {
   Video, Plus, Search, Users, Radio, Clock, Calendar,
-  ExternalLink, X, ChevronDown, Monitor,
+  ExternalLink, X, ChevronDown, Monitor, Loader2,
 } from 'lucide-react'
 import { CommunityTopbar } from '@/components/community/CommunityTopbar'
+import { useMeetings, useCreateMeeting } from '@/hooks/useMeetings'
 
 // ── Sala de Reuniones Vitalcom ──────────────────────────
 // Reuniones de comunidad y grupos de trabajo.
@@ -131,13 +132,31 @@ function formatFecha(iso: string): string {
 }
 
 export default function ReunionesPage() {
+  const { data: apiData } = useMeetings()
+  const createMeeting = useCreateMeeting()
+
+  // Combinar datos de API con fallback estático
+  const apiMeetings: Meeting[] = [...(apiData?.upcoming ?? []), ...(apiData?.past ?? [])].map((m: any) => ({
+    id: m.id,
+    titulo: m.title,
+    tipo: 'comunidad' as MeetingType,
+    plataforma: 'meet' as MeetingPlatform,
+    enlace: m.link || '',
+    fecha: m.date,
+    anfitrion: '',
+    descripcion: m.description,
+    estado: m.status === 'completed' ? 'finalizada' as MeetingStatus : new Date(m.date) <= new Date() ? 'live' as MeetingStatus : 'proxima' as MeetingStatus,
+    participantes: [],
+    totalParticipantes: 0,
+  }))
   const [meetings, setMeetings] = useState<Meeting[]>(INITIAL_MEETINGS)
+  const allMeetings = apiMeetings.length > 0 ? apiMeetings : meetings
   const [tab, setTab] = useState<Tab>('todas')
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
 
   const filtered = useMemo(() => {
-    return meetings
+    return allMeetings
       .filter(m => {
         if (tab === 'comunidad') return m.tipo === 'comunidad'
         if (tab === 'grupos') return m.tipo === 'grupo'

@@ -27,7 +27,7 @@ export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
       where,
       include: {
         items: {
-          include: { product: { select: { name: true, sku: true, images: true } } },
+          include: { product: { select: { name: true, sku: true, images: true, precioComunidad: true } } },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -37,16 +37,11 @@ export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     prisma.order.count({ where }),
   ])
 
-  // Calcular ganancia por pedido
-  const mapped = await Promise.all(orders.map(async (o) => {
-    // Buscar precio de costo de cada producto
-    let totalCost = 0
-    for (const item of o.items) {
-      const sync = await prisma.productSync.findFirst({
-        where: { shopifyStoreId: storeId, productId: item.productId },
-      })
-      totalCost += item.product ? (await prisma.product.findUnique({ where: { id: item.productId }, select: { precioComunidad: true } }))?.precioComunidad ?? 0 * item.quantity : 0
-    }
+  // Calcular ganancia por pedido (usando precioComunidad ya incluido en items)
+  const mapped = orders.map((o) => {
+    const totalCost = o.items.reduce(
+      (sum, item) => sum + (item.product?.precioComunidad ?? 0) * item.quantity, 0
+    )
 
     return {
       id: o.id,
@@ -68,7 +63,7 @@ export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
       carrier: o.carrier,
       createdAt: o.createdAt,
     }
-  }))
+  })
 
   return apiSuccess({
     orders: mapped,

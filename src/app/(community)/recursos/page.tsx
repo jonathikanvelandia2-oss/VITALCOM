@@ -5,9 +5,10 @@ import {
   BookOpen, FileText, Video, Image as ImageIcon, Download,
   Search, Star, Clock, Eye, Filter, Bookmark, ExternalLink,
   FileSpreadsheet, Palette, Megaphone, ShoppingCart, Target,
-  Users, Lightbulb, PlayCircle, FileDown,
+  Users, Lightbulb, PlayCircle, FileDown, Loader2,
 } from 'lucide-react'
 import { CommunityTopbar } from '@/components/community/CommunityTopbar'
+import { useResources, useTrackDownload } from '@/hooks/useResources'
 
 // ── Biblioteca de Recursos VITALCOMMERS ──────────────────
 // Materiales descargables, guías, plantillas, videos y
@@ -282,20 +283,39 @@ const FORMAT_CONFIG: Record<ResourceFormat, { icon: typeof FileText; label: stri
 export default function RecursosPage() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<ResourceCategory>('Todos')
+  const { data, isLoading } = useResources()
+  const trackDownload = useTrackDownload()
+
+  // Combinar datos de BD con datos estáticos como fallback
+  const apiResources = (data?.resources ?? []).map((r: any) => ({
+    id: r.id,
+    title: r.title,
+    description: r.description || '',
+    category: r.category as ResourceCategory,
+    format: (r.type || 'pdf') as ResourceFormat,
+    tags: [],
+    featured: false,
+    downloads: r.downloads || 0,
+    views: 0,
+    addedAt: r.createdAt,
+    previewImage: r.thumbnail || '',
+  }))
+
+  const allResources: Resource[] = apiResources.length > 0 ? apiResources : RESOURCES
 
   const filtered = useMemo(() => {
-    return RESOURCES.filter(r => {
+    return allResources.filter((r) => {
       if (category !== 'Todos' && r.category !== category) return false
       if (search) {
         const q = search.toLowerCase()
-        return r.title.toLowerCase().includes(q) || r.description.toLowerCase().includes(q) || r.tags.some(t => t.includes(q))
+        return r.title.toLowerCase().includes(q) || r.description.toLowerCase().includes(q) || (r.tags || []).some((t) => t.includes(q))
       }
       return true
     })
-  }, [search, category])
+  }, [search, category, allResources])
 
-  const featured = RESOURCES.filter(r => r.featured)
-  const totalDownloads = RESOURCES.reduce((sum, r) => sum + r.downloads, 0)
+  const featured = allResources.filter((r: Resource) => r.featured)
+  const totalDownloads = allResources.reduce((sum: number, r: Resource) => sum + r.downloads, 0)
 
   return (
     <>
