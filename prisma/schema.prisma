@@ -33,14 +33,12 @@ enum Country {
 }
 
 enum Area {
-  VENTAS
-  LOGISTICA
-  MARKETING
-  SOPORTE
-  FINANZAS
-  DIRECCION
-  PRODUCTO
-  COMUNIDAD
+  DIRECCION       // CEO — acceso total
+  MARKETING       // Campañas, contenido, comunidad
+  COMERCIAL       // Ventas, clientes, catálogo
+  ADMINISTRATIVA  // Operaciones, RRHH, procesos
+  LOGISTICA       // Stock, despachos, fulfillment Dropi
+  CONTABILIDAD    // Finanzas, facturación, liquidaciones
 }
 
 enum OrderStatus {
@@ -95,7 +93,8 @@ model User {
   orders           Order[]
   pricingCalcs     PricingCalculation[]
   workflows        WorkflowTemplate[]
-  courseProgress   CourseProgress[]
+  courseProgress    CourseProgress[]
+  shopifyStores    ShopifyStore[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -103,26 +102,30 @@ model User {
 // ─────────────────────────────────────────────────────────
 
 model Product {
-  id             String      @id @default(cuid())
-  sku            String      @unique
-  name           String
-  slug           String      @unique
-  description    String?
-  category       String?
-  subcategory    String?
-  images         String[]
-  basePrice      Float
-  suggestedPrice Float
-  weight         Float?
-  dimensions     Json?
-  active         Boolean     @default(true)
-  bestseller     Boolean     @default(false)
-  salesCount     Int         @default(0)
+  id               String      @id @default(cuid())
+  sku              String      @unique
+  name             String
+  slug             String      @unique
+  description      String?
+  category         String?
+  subcategory      String?
+  tags             String[]
+  images           String[]
+  // 3 niveles de precio reales Vitalcom (COP)
+  precioPublico    Float       // Precio consumidor final
+  precioComunidad  Float       // Precio miembros / dropshippers
+  precioPrivado    Float       // Precio VIP
+  weight           Float?
+  dimensions       Json?
+  active           Boolean     @default(true)
+  bestseller       Boolean     @default(false)
+  salesCount       Int         @default(0)
 
-  stock          Stock[]
-  orderItems     OrderItem[]
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  stock            Stock[]
+  orderItems       OrderItem[]
+  shopifySync      ProductSync[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 }
 
 model Stock {
@@ -297,6 +300,83 @@ model WorkflowTemplate {
   steps       Json
   isPublic    Boolean  @default(false)
   uses        Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────
+// INTEGRACIÓN SHOPIFY
+// ─────────────────────────────────────────────────────────
+
+model ShopifyStore {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  shopDomain      String    @unique   // mi-tienda.myshopify.com
+  storeName       String
+  accessToken     String?              // Token cifrado de Shopify API
+  status          String    @default("not_connected")
+  plan            String?
+  productsCount   Int       @default(0)
+  connectedAt     DateTime?
+  lastSyncAt      DateTime?
+  syncedProducts  ProductSync[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ProductSync {
+  id                 String    @id @default(cuid())
+  shopifyStoreId     String
+  store              ShopifyStore @relation(fields: [shopifyStoreId], references: [id], onDelete: Cascade)
+  productId          String
+  product            Product   @relation(fields: [productId], references: [id])
+  shopifyProductId   String
+  shopifyVariantId   String?
+  sellingPrice       Float     // Precio que el dropshipper puso en Shopify
+  status             String    @default("active")
+  soldTotal          Int       @default(0)
+  lastSyncAt         DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+
+  @@unique([shopifyStoreId, productId])
+}
+
+// ─────────────────────────────────────────────────────────
+// TOKENS DE SEGURIDAD
+// ─────────────────────────────────────────────────────────
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────
+// EVENTOS
+// ─────────────────────────────────────────────────────────
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime
+  endDate     DateTime?
+  link        String?              // URL de meet/zoom/teams
+  type        String   @default("webinar") // webinar, live, meetup, workshop
+  speaker     String?
+  cover       String?
+  published   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
