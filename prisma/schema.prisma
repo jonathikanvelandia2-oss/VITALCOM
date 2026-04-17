@@ -124,6 +124,14 @@ model Product {
   bestseller       Boolean     @default(false)
   salesCount       Int         @default(0)
 
+  // Landing page del producto
+  videoUrl         String?              // Video parallax (Cloudinary URL)
+  ingredients      Json?                // [{name, description, icon}]
+  benefits         Json?                // [{title, description, icon}]
+  howToUse         String?              // Instrucciones de uso
+  testimonials     Json?                // [{name, text, rating, photo}]
+  landingConfig    Json?                // {heroText, ctaText, accentColor, sections[]}
+
   stock            Stock[]
   orderItems       OrderItem[]
   shopifySync      ProductSync[]
