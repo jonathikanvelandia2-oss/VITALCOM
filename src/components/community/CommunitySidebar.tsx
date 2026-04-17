@@ -21,6 +21,7 @@ import {
   ShoppingBag,
   TrendingUp,
   Package,
+  Leaf,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 
@@ -37,6 +38,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/rendimiento', label: 'Rendimiento', icon: TrendingUp },
       { href: '/herramientas/catalogo', label: 'Catálogo Vitalcom', icon: Package },
       { href: '/herramientas/calculadora', label: 'Calculadora', icon: Calculator },
+      { href: '/asistente', label: 'VITA IA', icon: Leaf },
     ],
   },
   {
