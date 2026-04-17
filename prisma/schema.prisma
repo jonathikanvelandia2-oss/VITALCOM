@@ -114,10 +114,25 @@ model Product {
   subcategory      String?
   tags             String[]
   images           String[]
-  // 3 niveles de precio reales Vitalcom (COP)
+  // 8 niveles de precio Vitalcom (COP)
   precioPublico    Float       // Precio consumidor final
   precioComunidad  Float       // Precio miembros / dropshippers
   precioPrivado    Float       // Precio VIP
+  // Internos (solo admin)
+  precioCosto          Float?  // Costo de compra
+  precioMayorProv      Float?  // Mayor proveeduría
+  precioMayorContado   Float?  // Mayor contado
+  precioMayorCredito   Float?  // Mayor crédito
+  precioMaquilla       Float?  // Precio maquila
+
+  // Datos extendidos del catálogo
+  marca            String?     // Marca del producto
+  contenido        String?     // "60U", "500ML", "1200G"
+  presentacion     String?     // Capsulas, Liquido, Polvos, etc.
+  sabor            String?     // Natural, Uva, Fresa, etc.
+  bodega           String?     // BIOBEL, VITALCOM
+  codigoInterno    String?     // Código original de la base
+  pertenece        String?     // Dueño/influencer (para maquilas)
   weight           Float?
   dimensions       Json?
   active           Boolean     @default(true)
