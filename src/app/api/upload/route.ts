@@ -1,58 +1,71 @@
-import { apiSuccess, withErrorHandler } from '@/lib/api/response'
+import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth/session'
-import { supabaseAdmin, BUCKETS, getPublicUrl } from '@/lib/storage/supabase'
+
+export const runtime = 'nodejs'
+
+const BUCKETS = { products: 'products', videos: 'videos', avatars: 'avatars' }
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024
 
 // ── POST /api/upload — Subir archivo a Supabase Storage ─
-export const POST = withErrorHandler(async (req: Request) => {
-  await requireRole('EMPLOYEE')
+export async function POST(req: Request) {
+  try {
+    await requireRole('EMPLOYEE')
 
-  const formData = await req.formData()
-  const file = formData.get('file') as File | null
-  const bucket = (formData.get('bucket') as string) || BUCKETS.PRODUCTS
-  const folder = (formData.get('folder') as string) || ''
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    )
 
-  if (!file) throw new Error('NOT_FOUND')
+    const formData = await req.formData()
+    const file = formData.get('file') as File | null
+    const bucket = (formData.get('bucket') as string) || 'products'
+    const folder = (formData.get('folder') as string) || ''
 
-  // Validar tipo y tamaño (max 5MB para imágenes, 50MB para videos)
-  const maxSize = bucket === BUCKETS.VIDEOS ? 50 * 1024 * 1024 : 5 * 1024 * 1024
-  if (file.size > maxSize) {
-    throw new Error(`Archivo excede el límite de ${maxSize / 1024 / 1024}MB`)
+    if (!file) {
+      return NextResponse.json({ ok: false, error: 'Archivo requerido' }, { status: 400 })
+    }
+
+    const maxSize = bucket === 'videos' ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE
+    if (file.size > maxSize) {
+      return NextResponse.json({ ok: false, error: `Archivo excede ${maxSize / 1024 / 1024}MB` }, { status: 400 })
+    }
+
+    const allowedTypes = bucket === 'videos'
+      ? ['video/mp4', 'video/webm']
+      : ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
+
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json({ ok: false, error: `Tipo no permitido: ${file.type}` }, { status: 400 })
+    }
+
+    const timestamp = Date.now()
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+    const path = folder ? `${folder}/${timestamp}-${safeName}` : `${timestamp}-${safeName}`
+
+    const arrayBuffer = await file.arrayBuffer()
+
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(path, arrayBuffer, {
+        contentType: file.type,
+        upsert: false,
+      })
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+    }
+
+    const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`
+
+    return NextResponse.json({
+      ok: true,
+      data: { url: publicUrl, path, bucket, size: file.size, type: file.type },
+    }, { status: 201 })
+  } catch (e: any) {
+    const status = e.message === 'UNAUTHORIZED' ? 401 : e.message === 'FORBIDDEN' ? 403 : 500
+    return NextResponse.json({ ok: false, error: e.message || 'Error interno' }, { status })
   }
-
-  const allowedTypes = bucket === BUCKETS.VIDEOS
-    ? ['video/mp4', 'video/webm']
-    : ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
-
-  if (!allowedTypes.includes(file.type)) {
-    throw new Error(`Tipo no permitido: ${file.type}`)
-  }
-
-  // Generar path único
-  const ext = file.name.split('.').pop() || 'webp'
-  const timestamp = Date.now()
-  const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-  const path = folder
-    ? `${folder}/${timestamp}-${safeName}`
-    : `${timestamp}-${safeName}`
-
-  const buffer = Buffer.from(await file.arrayBuffer())
-
-  const { error } = await supabaseAdmin.storage
-    .from(bucket)
-    .upload(path, buffer, {
-      contentType: file.type,
-      upsert: false,
-    })
-
-  if (error) throw new Error(error.message)
-
-  const publicUrl = getPublicUrl(bucket, path)
-
-  return apiSuccess({
-    url: publicUrl,
-    path,
-    bucket,
-    size: file.size,
-    type: file.type,
-  }, 201)
-})
+}
