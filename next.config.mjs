@@ -8,6 +8,7 @@ const nextConfig = {
     remotePatterns: [
       { protocol: 'https', hostname: '**.supabase.co' },
       { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
     ],
   },
 
@@ -36,7 +37,7 @@ const nextConfig = {
               "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://fonts.googleapis.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
-              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com",
+              "img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://res.cloudinary.com",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.dropi.co https://api.openai.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
