@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, apiError, withErrorHandler } from '@/lib/api/response'
 import { requireRole } from '@/lib/auth/session'
 import { updateProductSchema } from '@/lib/api/schemas/product'
+import { ProductRepository } from '@/lib/repositories/product-repository'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -9,11 +10,7 @@ type Ctx = { params: Promise<{ id: string }> }
 export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   const { id } = await ctx!.params
 
-  const product = await prisma.product.findUnique({
-    where: { id },
-    include: { stock: true },
-  })
-
+  const product = await ProductRepository.findById(id)
   if (!product) throw new Error('NOT_FOUND')
 
   return apiSuccess(product)
@@ -54,6 +51,7 @@ export const PUT = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     include: { stock: true },
   })
 
+  ProductRepository.invalidateOne(product.id, product.slug)
   return apiSuccess(product)
 })
 
@@ -72,5 +70,6 @@ export const DELETE = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     data: { active: false },
   })
 
+  ProductRepository.invalidateOne(product.id, existing.slug)
   return apiSuccess({ id: product.id, active: false })
 })

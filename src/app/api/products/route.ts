@@ -1,8 +1,8 @@
-import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, apiError, withErrorHandler } from '@/lib/api/response'
 import { requireRole } from '@/lib/auth/session'
 import { createProductSchema, productFiltersSchema } from '@/lib/api/schemas/product'
+import { ProductRepository } from '@/lib/repositories/product-repository'
 import { Prisma } from '@prisma/client'
 
 // ── GET /api/products — Listado paginado con filtros ────
@@ -14,7 +14,6 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   const where: Prisma.ProductWhereInput = {}
 
-  // Búsqueda por nombre, SKU o tags
   if (filters.search) {
     where.OR = [
       { name: { contains: filters.search, mode: 'insensitive' } },
@@ -27,16 +26,13 @@ export const GET = withErrorHandler(async (req: Request) => {
   if (filters.active) where.active = filters.active === 'true'
   if (filters.bestseller) where.bestseller = filters.bestseller === 'true'
 
-  const [products, total] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      include: { stock: true },
-      orderBy: { [filters.sort]: filters.order },
-      skip: (filters.page - 1) * filters.limit,
-      take: filters.limit,
-    }),
-    prisma.product.count({ where }),
-  ])
+  const { products, total } = await ProductRepository.list({
+    where,
+    orderBy: { [filters.sort]: filters.order },
+    skip: (filters.page - 1) * filters.limit,
+    take: filters.limit,
+    includeStock: true,
+  })
 
   return apiSuccess({
     products,
@@ -80,5 +76,6 @@ export const POST = withErrorHandler(async (req: Request) => {
     include: { stock: true },
   })
 
+  ProductRepository.invalidateAll()
   return apiSuccess(product, 201)
 })
