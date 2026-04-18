@@ -24,20 +24,35 @@ export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
 })
 
 // ── PATCH /api/orders/[id] — Cambiar estado ─────────────
-// Valida transiciones permitidas (ej: PENDING → CONFIRMED ok, DELIVERED → PENDING no)
-// Acceso: EMPLOYEE o superior
+// Staff: transiciones normales.
+// Dueño del pedido: solo puede CANCELAR si está PENDING o CONFIRMED.
 export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   const session = await requireSession()
   const isStaff = ['SUPERADMIN', 'ADMIN', 'MANAGER_AREA', 'EMPLOYEE'].includes(session.role)
-  if (!isStaff) throw new Error('FORBIDDEN')
 
   const { id } = await ctx!.params
 
   const order = await prisma.order.findUnique({ where: { id } })
   if (!order) throw new Error('NOT_FOUND')
 
+  // Validar permisos: staff o dueño-cancelando-early
+  const isOwner = order.userId === session.id
+  if (!isStaff && !isOwner) throw new Error('FORBIDDEN')
+
   const body = await req.json()
   const data = updateOrderStatusSchema.parse(body)
+
+  // Dueño solo puede cancelar pedidos early-stage
+  if (!isStaff) {
+    const cancellable = ['PENDING', 'CONFIRMED']
+    if (data.status !== 'CANCELLED' || !cancellable.includes(order.status)) {
+      return apiError(
+        'Solo puedes cancelar pedidos que aún no están en proceso',
+        403,
+        'FORBIDDEN_TRANSITION',
+      )
+    }
+  }
 
   const allowed = VALID_TRANSITIONS[order.status] ?? []
   if (!allowed.includes(data.status)) {

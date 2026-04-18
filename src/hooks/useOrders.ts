@@ -50,7 +50,10 @@ export function useCreateOrder() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: CreateOrderInput) => mutator('/api/orders', 'POST', data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['orders'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orders'] })
+      qc.invalidateQueries({ queryKey: ['orders-stats'] })
+    },
   })
 }
 
@@ -63,6 +66,32 @@ export function useUpdateOrderStatus() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['orders'] })
       qc.invalidateQueries({ queryKey: ['order'] })
+      qc.invalidateQueries({ queryKey: ['orders-stats'] })
+      qc.invalidateQueries({ queryKey: ['pnl'] })
     },
+  })
+}
+
+/** Cancelar pedido (dueño o staff) — shortcut de useUpdateOrderStatus */
+export function useCancelOrder() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      mutator(`/api/orders/${id}`, 'PATCH', { status: 'CANCELLED' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orders'] })
+      qc.invalidateQueries({ queryKey: ['order'] })
+      qc.invalidateQueries({ queryKey: ['orders-stats'] })
+      qc.invalidateQueries({ queryKey: ['pnl'] })
+    },
+  })
+}
+
+/** KPIs de pedidos del usuario (o globales si es staff) */
+export function useOrdersStats() {
+  return useQuery({
+    queryKey: ['orders-stats'],
+    queryFn: () => fetcher('/api/orders/stats'),
+    staleTime: 30 * 1000,
   })
 }
