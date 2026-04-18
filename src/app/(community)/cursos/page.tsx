@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { GraduationCap, Clock, Award, PlayCircle, Loader2 } from 'lucide-react'
 import { CommunityTopbar } from '@/components/community/CommunityTopbar'
 import { useCourses } from '@/hooks/useCourses'
@@ -48,7 +49,12 @@ export default function CursosPage() {
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {courses.map((c: any, i: number) => (
-              <article key={c.id} className="vc-card group flex flex-col overflow-hidden" style={{ padding: 0 }}>
+              <Link
+                key={c.id}
+                href={`/cursos/${c.id}`}
+                className="vc-card group flex flex-col overflow-hidden transition-transform hover:-translate-y-0.5"
+                style={{ padding: 0 }}
+              >
                 {/* Cover */}
                 <div className="relative h-32" style={{ background: c.cover || COVER_GRADIENTS[i % COVER_GRADIENTS.length] }}>
                   <div className="absolute inset-0"
@@ -108,7 +114,7 @@ export default function CursosPage() {
                     )}
                   </div>
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
         )}
