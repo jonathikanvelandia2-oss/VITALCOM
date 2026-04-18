@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, apiError, withErrorHandler } from '@/lib/api/response'
-import { requireRole, requireSession } from '@/lib/auth/session'
+import { requireSession } from '@/lib/auth/session'
 import { createOrderSchema, orderFiltersSchema } from '@/lib/api/schemas/order'
+import { OrderRepository } from '@/lib/repositories/order-repository'
 import { Prisma } from '@prisma/client'
 
 // ── GET /api/orders — Listado paginado con filtros ──────
@@ -15,7 +16,6 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   const where: Prisma.OrderWhereInput = {}
 
-  // Comunidad/Dropshipper solo ve sus propios pedidos
   const isStaff = ['SUPERADMIN', 'ADMIN', 'MANAGER_AREA', 'EMPLOYEE'].includes(session.role)
   if (!isStaff) {
     where.userId = session.id
@@ -33,19 +33,12 @@ export const GET = withErrorHandler(async (req: Request) => {
   if (filters.source) where.source = filters.source
   if (filters.country) where.country = filters.country
 
-  const [orders, total] = await Promise.all([
-    prisma.order.findMany({
-      where,
-      include: {
-        items: { include: { product: { select: { id: true, sku: true, name: true } } } },
-        user: { select: { id: true, name: true, email: true } },
-      },
-      orderBy: { [filters.sort]: filters.order },
-      skip: (filters.page - 1) * filters.limit,
-      take: filters.limit,
-    }),
-    prisma.order.count({ where }),
-  ])
+  const { orders, total } = await OrderRepository.list({
+    where,
+    orderBy: { [filters.sort]: filters.order },
+    skip: (filters.page - 1) * filters.limit,
+    take: filters.limit,
+  })
 
   return apiSuccess({
     orders,
@@ -66,20 +59,14 @@ export const POST = withErrorHandler(async (req: Request) => {
   const body = await req.json()
   const data = createOrderSchema.parse(body)
 
-  // Generar número de pedido único
+  // Conteo sin cache — debe ser siempre preciso para número único
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const countToday = await prisma.order.count({
-    where: {
-      number: { startsWith: `VC-${data.country}-${today}` },
-    },
-  })
+  const countToday = await OrderRepository.countForToday(data.country)
   const number = `VC-${data.country}-${today}-${String(countToday + 1).padStart(4, '0')}`
 
-  // Calcular subtotal desde items
   const subtotal = data.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0)
   const total = subtotal + data.shipping
 
-  // Verificar que todos los productos existen
   const productIds = data.items.map((i) => i.productId)
   const products = await prisma.product.findMany({
     where: { id: { in: productIds }, active: true },
@@ -118,5 +105,6 @@ export const POST = withErrorHandler(async (req: Request) => {
     },
   })
 
+  OrderRepository.invalidateAll()
   return apiSuccess(order, 201)
 })

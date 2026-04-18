@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireRole } from '@/lib/auth/session'
 import { updateStockSchema, stockFiltersSchema } from '@/lib/api/schemas/product'
+import { StockRepository } from '@/lib/repositories/stock-repository'
 import { Prisma } from '@prisma/client'
 
 // ── GET /api/stock — Stock por país con filtros ─────────
@@ -17,7 +18,6 @@ export const GET = withErrorHandler(async (req: Request) => {
   if (filters.country) where.country = filters.country
   if (filters.lowStock) where.quantity = { lt: filters.lowStock }
 
-  // Búsqueda por nombre o SKU del producto
   if (filters.search) {
     where.product = {
       OR: [
@@ -27,20 +27,11 @@ export const GET = withErrorHandler(async (req: Request) => {
     }
   }
 
-  const [items, total] = await Promise.all([
-    prisma.stock.findMany({
-      where,
-      include: {
-        product: {
-          select: { id: true, sku: true, name: true, category: true, active: true, images: true },
-        },
-      },
-      orderBy: { product: { name: 'asc' } },
-      skip: (filters.page - 1) * filters.limit,
-      take: filters.limit,
-    }),
-    prisma.stock.count({ where }),
-  ])
+  const { items, total } = await StockRepository.list({
+    where,
+    skip: (filters.page - 1) * filters.limit,
+    take: filters.limit,
+  })
 
   return apiSuccess({
     stock: items,
@@ -62,10 +53,9 @@ export const PUT = withErrorHandler(async (req: Request) => {
   const body = await req.json()
   const data = updateStockSchema.parse(body)
 
-  // Verificar que el producto existe
   const product = await prisma.product.findUnique({
     where: { id: data.productId },
-    select: { id: true, sku: true, name: true },
+    select: { id: true, sku: true, name: true, slug: true },
   })
   if (!product) throw new Error('NOT_FOUND')
 
@@ -93,5 +83,6 @@ export const PUT = withErrorHandler(async (req: Request) => {
     },
   })
 
+  StockRepository.invalidateProduct(product.id, product.slug)
   return apiSuccess(stock)
 })

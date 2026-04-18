@@ -1,7 +1,8 @@
-import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, apiError, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { updateOrderStatusSchema, VALID_TRANSITIONS } from '@/lib/api/schemas/order'
+import { OrderRepository } from '@/lib/repositories/order-repository'
+import { prisma } from '@/lib/db/prisma'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -10,17 +11,9 @@ export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   const session = await requireSession()
   const { id } = await ctx!.params
 
-  const order = await prisma.order.findUnique({
-    where: { id },
-    include: {
-      items: { include: { product: { select: { id: true, sku: true, name: true, images: true } } } },
-      user: { select: { id: true, name: true, email: true } },
-    },
-  })
-
+  const order = await OrderRepository.findById(id)
   if (!order) throw new Error('NOT_FOUND')
 
-  // Comunidad solo puede ver sus propios pedidos
   const isStaff = ['SUPERADMIN', 'ADMIN', 'MANAGER_AREA', 'EMPLOYEE'].includes(session.role)
   if (!isStaff && order.userId !== session.id) {
     throw new Error('FORBIDDEN')
@@ -45,7 +38,6 @@ export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   const body = await req.json()
   const data = updateOrderStatusSchema.parse(body)
 
-  // Validar transición de estado
   const allowed = VALID_TRANSITIONS[order.status] ?? []
   if (!allowed.includes(data.status)) {
     return apiError(
@@ -68,5 +60,6 @@ export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     },
   })
 
+  OrderRepository.invalidateOne(id, order.userId)
   return apiSuccess(updated)
 })
