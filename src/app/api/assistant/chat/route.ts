@@ -389,6 +389,47 @@ export async function POST(req: Request) {
           return { summary, ratios, benchmarks }
         },
       }),
+
+      getMyBlueprint: tool({
+        description:
+          'Diagnóstico 0-100 del dropshipper con 5 acciones accionables esta semana. Úsalo cuando el usuario pregunte "cómo voy", "qué hago", "plan de acción", "diagnóstico", "mi score" o pida un resumen holístico del estado de su negocio.',
+        inputSchema: z.object({
+          period: z.enum(['7d', '30d', '90d']).optional(),
+        }),
+        execute: async ({ period }) => {
+          const { computeBlueprint } = await import('@/lib/blueprint/blueprint-service')
+          const { runBlueprintAnalyst } = await import('@/lib/ai/agents/blueprint-analyst')
+          const diagnostic = await computeBlueprint(userId, period ?? '30d')
+          const actions = await runBlueprintAnalyst(diagnostic)
+          return {
+            score: diagnostic.score,
+            tier: diagnostic.tier,
+            periodo: diagnostic.period,
+            pilares: diagnostic.pillars.map((p) => ({
+              id: p.id,
+              label: p.label,
+              puntos: `${p.score}/${p.max}`,
+              status: p.status,
+              detalle: p.note,
+            })),
+            acciones: actions.map((a) => ({
+              orden: a.order,
+              titulo: a.title,
+              descripcion: a.description,
+              impacto: a.impact,
+              esfuerzo: a.effort,
+              link: a.link,
+            })),
+            senales: {
+              ingresoBruto: diagnostic.signals.ingresoBruto,
+              gananciaNeta: diagnostic.signals.gananciaNeta,
+              margenNeto: diagnostic.signals.margenNeto,
+              ordenes: diagnostic.signals.ordersCount,
+              ticketPromedio: diagnostic.signals.ticketPromedio,
+            },
+          }
+        },
+      }),
     },
 
     onFinish: async ({ text }) => {

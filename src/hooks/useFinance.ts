@@ -75,3 +75,13 @@ export function useMentorInsights(period: '7d' | '30d' | '90d' = '30d') {
     retry: false,
   })
 }
+
+/** Blueprint completo: diagnóstico 0-100 + 5 acciones semanales */
+export function useBlueprint(period: '7d' | '30d' | '90d' = '30d') {
+  return useQuery({
+    queryKey: ['blueprint', period],
+    queryFn: () => fetcher(`/api/blueprint?period=${period}`),
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  })
+}

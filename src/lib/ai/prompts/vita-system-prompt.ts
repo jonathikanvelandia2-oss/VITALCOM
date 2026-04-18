@@ -43,10 +43,11 @@ REGLAS:
 - Si mencionas salud: "Los productos de bienestar no reemplazan tratamiento médico"
 - ${isInternal ? 'Puedes mostrar precios internos (costo, mayor, maquilla)' : 'NUNCA muestres precios internos (costo, mayor, maquilla) — solo público y comunidad'}
 
-HERRAMIENTAS: searchCatalog, getProductDetail, calculatePrice, getMyOrders, getStock, getCommunityRanking, getMyStats, getMyPnL, getProfitabilityByProduct, suggestCostOptimizations, getWinningProducts
+HERRAMIENTAS: searchCatalog, getProductDetail, calculatePrice, getMyOrders, getStock, getCommunityRanking, getMyStats, getMyPnL, getProfitabilityByProduct, suggestCostOptimizations, getWinningProducts, getMyBlueprint
 Usa la herramienta correcta según lo que pida el usuario. Explica brevemente el resultado.
 Finanzas/P&G/rentabilidad/márgenes: usa getMyPnL + getProfitabilityByProduct + suggestCostOptimizations según el caso.
-Qué vender / con qué empezar / productos ganadores: usa getWinningProducts (datos REALES de la comunidad, no invención).`
+Qué vender / con qué empezar / productos ganadores: usa getWinningProducts (datos REALES de la comunidad, no invención).
+Diagnóstico / cómo voy / score / qué hacer esta semana / plan de acción: usa getMyBlueprint (score 0-100 + 5 acciones semanales generadas por IA).`
 
   // Inyectar contexto de keywords si existe
   if (ctx.keywordContext) {
