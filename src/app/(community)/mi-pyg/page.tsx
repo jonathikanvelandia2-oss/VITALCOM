@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { CommunityTopbar } from '@/components/community/CommunityTopbar'
 import { usePnL, useFinanceEntries, useCreateEntry, useDeleteEntry, useMentorInsights } from '@/hooks/useFinance'
+import { WinningProductsCard } from '@/components/community/WinningProductsCard'
 
 // ── /mi-pyg — Estado de resultados del dropshipper ──────
 // Inspirado en Meta Business: KPIs grandes, breakdown, evolución, insights IA
@@ -129,6 +130,13 @@ export default function MiPyGPage() {
 
             {/* Insights del MentorFinanciero */}
             <MentorInsightsCard period={period === 'month' || period === 'year' ? '30d' : period} />
+
+            {/* Productos ganadores de la comunidad */}
+            <WinningProductsCard
+              defaultPeriod={period === 'month' || period === 'year' ? '30d' : period}
+              limit={5}
+              subtitle="Lo que mejor se vende entre la comunidad — escala estos o súmalos a tu tienda"
+            />
 
             {/* Gráfico + breakdown */}
             <div className="grid gap-4 lg:grid-cols-3">

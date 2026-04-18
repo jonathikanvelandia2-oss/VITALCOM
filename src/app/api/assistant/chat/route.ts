@@ -15,6 +15,7 @@ import { classifyQuery } from '@/lib/ai/router'
 import { interpretKeywords } from '@/lib/ai/keywords'
 import { getCachedResponse, cacheResponse, learnPattern, getFrequentPatterns } from '@/lib/ai/cache'
 import { FinanceRepository } from '@/lib/repositories/finance-repository'
+import { InsightsRepository } from '@/lib/repositories/insights-repository'
 
 const MAX_HISTORY_MESSAGES = 8
 
@@ -336,6 +337,31 @@ export async function POST(req: Request) {
         execute: async ({ period, limit }) => {
           const rows = await FinanceRepository.getProfitability(userId, period ?? '30d', limit ?? 10)
           return { productos: rows }
+        },
+      }),
+
+      getWinningProducts: tool({
+        description:
+          'Top productos Vitalcom que mejor están vendiendo en la comunidad. Úsalo cuando el usuario pregunte qué producto vender, con qué empezar, cuáles están pegando, o qué agregar a su tienda. Son recomendaciones basadas en ventas REALES de otros dropshippers.',
+        inputSchema: z.object({
+          period: z.enum(['7d', '30d', '90d']).optional().describe('Periodo a analizar'),
+          limit: z.number().int().positive().max(10).optional().describe('Cuántos devolver'),
+        }),
+        execute: async ({ period, limit }) => {
+          const products = await InsightsRepository.getWinningProducts(period ?? '30d', limit ?? 5)
+          return {
+            periodo: period ?? '30d',
+            productos: products.map((p) => ({
+              sku: p.sku,
+              nombre: p.name,
+              unidadesVendidas: p.unitsSold,
+              dropshippersVendiendo: p.dropshippersCount,
+              precioComunidad: p.precioComunidad,
+              margenSugerido: p.suggestedMargin,
+              trending: p.isTrending,
+              trendPct: p.trendPct,
+            })),
+          }
         },
       }),
 

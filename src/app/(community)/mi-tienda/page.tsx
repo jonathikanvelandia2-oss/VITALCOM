@@ -18,6 +18,7 @@ import {
   getStatusColor, getStatusLabel,
   type StoreTemplate,
 } from '@/lib/integrations/shopify'
+import { WinningProductsCard } from '@/components/community/WinningProductsCard'
 
 // ── Mi Tienda — Hub de gestión Shopify para VITALCOMMERS ─
 
@@ -132,6 +133,12 @@ function StoreDashboard({ storeId }: { storeId: string }) {
           <InfoBlock label="Conectada desde" value={store.connectedAt ? new Date(store.connectedAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'} />
         </div>
       </div>
+
+      {/* Productos ganadores de la comunidad — arriba de "top en tu tienda" */}
+      <WinningProductsCard
+        limit={5}
+        subtitle="Qué está vendiendo mejor la comunidad VITALCOMMERS — importa estos para maximizar conversión"
+      />
 
       {/* Top productos */}
       {products.length > 0 && (
@@ -368,6 +375,13 @@ function CreateStoreView() {
             </div>
           </div>
         </div>
+
+        {/* Productos ganadores — ayuda al nuevo a elegir con qué empezar */}
+        <WinningProductsCard
+          limit={5}
+          title="Con qué empezar — ya probado por la comunidad"
+          subtitle="Los productos Vitalcom que mejor están funcionando. Importa estos a tu tienda apenas la tengas lista."
+        />
 
         {showTemplates ? (
           <div>
