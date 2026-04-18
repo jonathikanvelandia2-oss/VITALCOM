@@ -2,6 +2,7 @@ import { apiSuccess, apiError, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { updateOrderStatusSchema, VALID_TRANSITIONS } from '@/lib/api/schemas/order'
 import { OrderRepository } from '@/lib/repositories/order-repository'
+import { FinanceRepository } from '@/lib/repositories/finance-repository'
 import { prisma } from '@/lib/db/prisma'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -59,6 +60,15 @@ export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
       items: { include: { product: { select: { id: true, sku: true, name: true } } } },
     },
   })
+
+  // Efectos financieros según el nuevo estado
+  if (data.status === 'DELIVERED') {
+    await FinanceRepository.recordOrderDelivery(id)
+  } else if (data.status === 'CANCELLED') {
+    await FinanceRepository.recordOrderCancellation(id)
+  } else if (data.status === 'RETURNED') {
+    await FinanceRepository.recordOrderReturn(id)
+  }
 
   OrderRepository.invalidateOne(id, order.userId)
   return apiSuccess(updated)

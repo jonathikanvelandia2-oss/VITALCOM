@@ -14,6 +14,7 @@ import { buildVITASystemPrompt, buildMinimalPrompt } from '@/lib/ai/prompts/vita
 import { classifyQuery } from '@/lib/ai/router'
 import { interpretKeywords } from '@/lib/ai/keywords'
 import { getCachedResponse, cacheResponse, learnPattern, getFrequentPatterns } from '@/lib/ai/cache'
+import { FinanceRepository } from '@/lib/repositories/finance-repository'
 
 const MAX_HISTORY_MESSAGES = 8
 
@@ -300,6 +301,66 @@ export async function POST(req: Request) {
             totalSpent: totalSpent._sum.total || 0,
             postsCount,
           }
+        },
+      }),
+
+      getMyPnL: tool({
+        description: 'Estado de resultados (P&G) del dropshipper — ingresos, costos, ganancia neta y márgenes.',
+        inputSchema: z.object({
+          period: z.enum(['7d', '30d', '90d', 'month', 'year']).optional().describe('Periodo (default 30d)'),
+        }),
+        execute: async ({ period }) => {
+          const summary = await FinanceRepository.getPnL(userId, period ?? '30d')
+          return {
+            periodo: summary.period,
+            ingresoBruto: summary.ingresoBruto,
+            gananciaBruta: summary.gananciaBruta,
+            gananciaNeta: summary.gananciaNeta,
+            margenBruto: summary.margenBruto,
+            margenNeto: summary.margenNeto,
+            roi: summary.roi,
+            gastoPublicidad: summary.gastoPublicidad,
+            costoProducto: summary.costoProducto,
+            ordersCount: summary.ordersCount,
+            ticketPromedio: summary.ticketPromedio,
+          }
+        },
+      }),
+
+      getProfitabilityByProduct: tool({
+        description: 'Qué productos dejan más ganancia neta al dropshipper. Úsalo para recomendar en qué enfocarse.',
+        inputSchema: z.object({
+          period: z.enum(['7d', '30d', '90d', 'month', 'year']).optional(),
+          limit: z.number().int().positive().max(20).optional(),
+        }),
+        execute: async ({ period, limit }) => {
+          const rows = await FinanceRepository.getProfitability(userId, period ?? '30d', limit ?? 10)
+          return { productos: rows }
+        },
+      }),
+
+      suggestCostOptimizations: tool({
+        description:
+          'Analiza el P&G del usuario y devuelve ratios clave para sugerir optimizaciones de costos. Úsalo cuando el usuario pregunte cómo ganar más, qué gastos reducir, o por qué no está ganando.',
+        inputSchema: z.object({
+          period: z.enum(['7d', '30d', '90d']).optional(),
+        }),
+        execute: async ({ period }) => {
+          const summary = await FinanceRepository.getPnL(userId, period ?? '30d')
+          const ratios = {
+            costoProductoSobreIngreso: summary.ingresoBruto > 0 ? (summary.costoProducto / summary.ingresoBruto) * 100 : 0,
+            envioSobreIngreso: summary.ingresoBruto > 0 ? (summary.costoEnvio / summary.ingresoBruto) * 100 : 0,
+            publicidadSobreIngreso: summary.ingresoBruto > 0 ? (summary.gastoPublicidad / summary.ingresoBruto) * 100 : 0,
+            devolucionesSobreIngreso: summary.ingresoBruto > 0 ? (summary.devoluciones / summary.ingresoBruto) * 100 : 0,
+            otrosSobreIngreso: summary.ingresoBruto > 0 ? (summary.otrosEgresos / summary.ingresoBruto) * 100 : 0,
+          }
+          const benchmarks = {
+            costoProductoSobreIngreso: 'Ideal <40%',
+            envioSobreIngreso: 'Ideal <10%',
+            publicidadSobreIngreso: 'Ideal 15-25%',
+            devolucionesSobreIngreso: 'Ideal <5%',
+          }
+          return { summary, ratios, benchmarks }
         },
       }),
     },

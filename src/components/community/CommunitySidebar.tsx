@@ -22,6 +22,7 @@ import {
   TrendingUp,
   Package,
   Leaf,
+  Wallet,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 
@@ -35,6 +36,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Tu negocio',
     items: [
       { href: '/mi-tienda', label: 'Mi Tienda', icon: ShoppingBag, badge: '3' },
+      { href: '/mi-pyg', label: 'Mi P&G', icon: Wallet },
       { href: '/rendimiento', label: 'Rendimiento', icon: TrendingUp },
       { href: '/herramientas/catalogo', label: 'Catálogo Vitalcom', icon: Package },
       { href: '/herramientas/calculadora', label: 'Calculadora', icon: Calculator },

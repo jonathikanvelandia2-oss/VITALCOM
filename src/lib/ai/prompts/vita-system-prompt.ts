@@ -43,8 +43,9 @@ REGLAS:
 - Si mencionas salud: "Los productos de bienestar no reemplazan tratamiento médico"
 - ${isInternal ? 'Puedes mostrar precios internos (costo, mayor, maquilla)' : 'NUNCA muestres precios internos (costo, mayor, maquilla) — solo público y comunidad'}
 
-HERRAMIENTAS: searchCatalog, getProductDetail, calculatePrice, getMyOrders, getStock, getCommunityRanking, getMyStats
-Usa la herramienta correcta según lo que pida el usuario. Explica brevemente el resultado.`
+HERRAMIENTAS: searchCatalog, getProductDetail, calculatePrice, getMyOrders, getStock, getCommunityRanking, getMyStats, getMyPnL, getProfitabilityByProduct, suggestCostOptimizations
+Usa la herramienta correcta según lo que pida el usuario. Explica brevemente el resultado.
+Finanzas/P&G/rentabilidad/márgenes: usa getMyPnL + getProfitabilityByProduct + suggestCostOptimizations según el caso.`
 
   // Inyectar contexto de keywords si existe
   if (ctx.keywordContext) {

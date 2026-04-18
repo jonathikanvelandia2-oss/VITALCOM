@@ -58,6 +58,35 @@ enum OrderSource {
   DROPSHIPPER
 }
 
+// ─── FINANZAS (P&L del dropshipper) ───
+enum FinanceType {
+  INGRESO
+  EGRESO
+}
+
+enum FinanceCategory {
+  VENTA               // Ingreso por venta de orden
+  COSTO_PRODUCTO      // COGS (costo directo del producto)
+  ENVIO               // Costo de envío al cliente
+  PUBLICIDAD          // Meta, TikTok, Google ads
+  COMISION_PLATAFORMA // Shopify, pasarela, Vitalcom
+  DEVOLUCION          // Reembolso o devolución
+  EMPAQUE             // Material de empaque
+  OPERATIVO           // Gastos operativos (internet, software)
+  IMPUESTO            // IVA, retenciones
+  OTRO                // Catch-all manual
+}
+
+enum FinanceSource {
+  MANUAL          // Registrado por el usuario
+  ORDER_REVENUE   // Auto-generado al entregar orden
+  ORDER_COGS      // Auto-generado al entregar orden
+  ORDER_SHIPPING  // Auto-generado al entregar orden
+  ORDER_RETURN    // Auto-generado al devolver orden
+  AD_SPEND        // Importado de Meta/TikTok/Google (Fase V2)
+  SYSTEM          // Otro auto
+}
+
 // ─────────────────────────────────────────────────────────
 // USUARIOS Y AUTH
 // ─────────────────────────────────────────────────────────
@@ -98,6 +127,7 @@ model User {
   tasks            Task[]
   meetings         Meeting[]
   uploadedDocs     Document[]          @relation("UploadedDocs")
+  financeEntries   FinanceEntry[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -456,6 +486,39 @@ model EmailVerificationToken {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────
+// FINANZAS DEL DROPSHIPPER (P&L)
+// ─────────────────────────────────────────────────────────
+// Cada movimiento financiero del dropshipper. Combina entradas
+// automáticas (ventas, COGS, envío) generadas al cerrar órdenes +
+// entradas manuales (publicidad, empaque, operativo).
+// El P&L se calcula agregando por periodo, tipo y categoría.
+
+model FinanceEntry {
+  id             String           @id @default(cuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date           DateTime         @default(now())
+  type           FinanceType
+  category       FinanceCategory
+  amount         Float             // Siempre positivo; el tipo indica signo
+  currency       String           @default("COP")
+  description    String?
+  source         FinanceSource    @default(MANUAL)
+
+  // Referencias opcionales para rastrear origen
+  relatedOrderId    String?
+  relatedProductId  String?
+  metadata          Json?         // Flexible: platformId, campaignId, adId (fase V2+)
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, type, category])
+  @@index([relatedOrderId])
 }
 
 // ─────────────────────────────────────────────────────────
