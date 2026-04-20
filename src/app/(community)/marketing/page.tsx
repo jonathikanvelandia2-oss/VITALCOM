@@ -1,20 +1,22 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import {
   Sparkles, Copy, Check, RefreshCw, Send, Instagram,
   MessageCircle, Video, Calendar, Target, TrendingUp,
-  Megaphone, ChevronDown, ChevronUp, Zap, Star,
+  Megaphone, ChevronDown, ChevronUp, Zap, Star, AlertCircle,
 } from 'lucide-react'
 import { CommunityTopbar } from '@/components/community/CommunityTopbar'
 
-// ── Marketing para emprendedores Vitalcom ───────────────
-// Generador de contenido, estrategias pre-armadas, calendario
-// semanal e insights. Todo enfocado en bienestar + dropshipping.
+// ── Marketing VITALCOMMER ───────────────────────────────
+// Estrategias de referencia + generador de contenido AI
+// conectado a /api/marketing/generate (OpenAI).
+// Los 6 planes de estrategia son contenido educativo estático
+// (guías de proceso) — para flujos automatizados, ir a /automatizaciones.
 
 type ContentTab = 'posts' | 'stories' | 'tiktok' | 'whatsapp'
 
-// ── Estrategias pre-diseñadas ───────────────────────────
 const STRATEGIES = [
   {
     id: 'launch', emoji: '🎯', name: 'Campaña de lanzamiento',
@@ -54,90 +56,6 @@ const STRATEGIES = [
   },
 ]
 
-// ── Contenido generado de demo ──────────────────────────
-const DEMO_CONTENT: Record<ContentTab, string> = {
-  posts: `🌿 ¿Sabías que el colágeno hidrolizado puede transformar tu piel en solo 30 días?
-
-No es magia, es ciencia. El colágeno tipo I y III ayuda a:
-✅ Reducir arrugas y líneas de expresión
-✅ Fortalecer uñas y cabello
-✅ Mejorar la elasticidad de tu piel
-
-💚 En Vitalcom tenemos colágeno premium con envío a todo Colombia.
-
-¿Ya lo probaste? Cuéntame tu experiencia 👇
-
-#BienestarNatural #Colágeno #VidaSaludable #Vitalcom #DropshippingColombia`,
-
-  stories: `📱 SECUENCIA DE 5 STORIES:
-
-STORY 1 — HOOK
-"¿Quieres saber el secreto de las mujeres que no envejecen?"
-[Fondo: foto producto + emoji 🤫]
-
-STORY 2 — PROBLEMA
-"Después de los 25, pierdes 1% de colágeno cada año"
-[Dato impactante con número grande]
-
-STORY 3 — SOLUCIÓN
-"Colágeno Hidrolizado Premium — 100% natural, sin azúcar"
-[Foto del producto con precio]
-
-STORY 4 — PRUEBA SOCIAL
-"Mira lo que dice Carolina después de 30 días →"
-[Screenshot de testimonio real]
-
-STORY 5 — CTA
-"Escríbeme 'QUIERO' y te envío toda la info 📩"
-[Sticker de enlace o DM]`,
-
-  tiktok: `🎬 SCRIPT TIKTOK (45 segundos):
-
-00:00 - 00:03 [HOOK]
-"POV: Descubriste el negocio que te da libertad financiera"
-(Caminando, mirando el celular con cara de sorpresa)
-
-00:03 - 00:10 [CONTEXTO]
-"Vendo productos de bienestar sin inversión, sin bodega, sin riesgo"
-(Mostrando la app de pedidos, productos llegando)
-
-00:10 - 00:25 [DESARROLLO]
-"Elijo los productos → comparto con mis clientes → Vitalcom envía por mí → yo cobro la ganancia"
-(Transiciones rápidas mostrando cada paso)
-
-00:25 - 00:35 [RESULTADO]
-"Esta semana: 12 pedidos, $850K de ganancia neta"
-(Mostrando pantalla de métricas — pixelar montos si prefieres)
-
-00:35 - 00:45 [CTA]
-"¿Quieres empezar? Link en mi bio — es gratis registrarse"
-(Señalando hacia arriba, sonrisa)
-
-🎵 Audio sugerido: trending motivacional
-#Dropshipping #Emprendimiento #Vitalcom #BienestarQueConecta`,
-
-  whatsapp: `💬 PLANTILLA WHATSAPP:
-
-Hola {nombre} 👋
-
-Soy [tu nombre] de la comunidad Vitalcom 🌿
-
-Vi que te interesó nuestro catálogo de productos de bienestar y quería contarte que esta semana tenemos algo especial:
-
-✨ *Colágeno Hidrolizado Premium*
-• 30 sobres para un mes completo
-• Sabor neutro, fácil de tomar
-• Envío gratis a tu ciudad
-• Precio especial: $65.000 (antes $89.000)
-
-📦 Envío en 2-3 días hábiles a todo Colombia con Servientrega.
-
-¿Te gustaría que te reserve uno? Solo dime "SÍ" y te paso el link de pago seguro 🔒
-
-Si tienes dudas, estoy aquí para ayudarte 💚`,
-}
-
-// ── Calendario semanal demo ─────────────────────────────
 const WEEKLY_CALENDAR = [
   { day: 'Lunes', type: '📸 Post', content: 'Beneficios del producto estrella', hashtags: '#BienestarNatural #Tips', time: '10:00 AM' },
   { day: 'Martes', type: '📱 Story', content: 'Detrás de cámaras: tu rutina con productos', hashtags: '#RutinaVitalcom', time: '12:00 PM' },
@@ -148,12 +66,29 @@ const WEEKLY_CALENDAR = [
   { day: 'Domingo', type: '📱 Story', content: 'Reflexión + meta de la semana', hashtags: '#Motivación #Emprender', time: '8:00 PM' },
 ]
 
+const INSIGHTS = [
+  { icon: Star, title: 'Mejor horario', text: 'Publicar entre 10am y 6pm duplica el engagement en LATAM', color: 'var(--vc-lime-main)' },
+  { icon: Calendar, title: 'Frecuencia ideal', text: '3-5 publicaciones por semana mantienen audiencia activa', color: 'var(--vc-info)' },
+  { icon: TrendingUp, title: 'Formatos top', text: 'Reels y carruseles tienen 2-3x más alcance que fotos estáticas', color: 'var(--vc-warning)' },
+  { icon: Megaphone, title: 'Siguiente paso', text: 'Activa "Seguimiento postventa" en Automatizaciones para pedir reseñas', color: 'var(--vc-lime-main)' },
+]
+
+const TABS: { key: ContentTab; label: string; icon: any }[] = [
+  { key: 'posts', label: 'Posts', icon: Instagram },
+  { key: 'stories', label: 'Stories', icon: Send },
+  { key: 'tiktok', label: 'TikTok', icon: Video },
+  { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
+]
+
 export default function MarketingPage() {
   const [activeTab, setActiveTab] = useState<ContentTab>('posts')
   const [copied, setCopied] = useState(false)
   const [expandedStrategy, setExpandedStrategy] = useState<string | null>(null)
-  const [generating, setGenerating] = useState(false)
   const [topic, setTopic] = useState('')
+  const [content, setContent] = useState<string>('')
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)
 
   function copyContent(text: string) {
     navigator.clipboard.writeText(text)
@@ -161,25 +96,35 @@ export default function MarketingPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  function handleGenerate() {
-    if (!topic.trim()) return
+  async function handleGenerate() {
+    const trimmed = topic.trim()
+    if (!trimmed) return
     setGenerating(true)
-    setTimeout(() => setGenerating(false), 1500)
+    setGenError(null)
+    setWarning(null)
+    try {
+      const res = await fetch('/api/marketing/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: activeTab, topic: trimmed }),
+      })
+      const json = await res.json()
+      if (!json.ok) throw new Error(json.error || 'Error generando contenido')
+      setContent(json.data.content)
+      if (json.data.warning) setWarning(json.data.warning)
+    } catch (err) {
+      setGenError((err as Error).message)
+    } finally {
+      setGenerating(false)
+    }
   }
-
-  const TABS: { key: ContentTab; label: string; icon: any }[] = [
-    { key: 'posts', label: 'Posts', icon: Instagram },
-    { key: 'stories', label: 'Stories', icon: Send },
-    { key: 'tiktok', label: 'TikTok', icon: Video },
-    { key: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
-  ]
 
   return (
     <>
-      <CommunityTopbar title="Marketing" subtitle="Genera contenido y estrategias para tu negocio" />
+      <CommunityTopbar title="Marketing" subtitle="Genera contenido y acciona estrategias" />
       <div className="flex-1 space-y-6 p-4 md:p-6">
 
-        {/* ── Estrategias pre-diseñadas ──────────────── */}
+        {/* ── Estrategias ────────────────────────────── */}
         <div>
           <h2 className="heading-sm mb-4 flex items-center gap-2 px-1">
             <Target size={16} color="var(--vc-lime-main)" /> Estrategias listas para usar
@@ -191,12 +136,22 @@ export default function MarketingPage() {
                 <div key={s.id} className="vc-card flex flex-col">
                   <div className="mb-2 flex items-start justify-between">
                     <span className="text-2xl">{s.emoji}</span>
-                    <span className="text-[9px] font-bold uppercase" style={{ color: 'var(--vc-white-dim)', fontFamily: 'var(--font-mono)' }}>
+                    <span
+                      className="text-[9px] font-bold uppercase"
+                      style={{ color: 'var(--vc-white-dim)', fontFamily: 'var(--font-mono)' }}
+                    >
                       {s.target}
                     </span>
                   </div>
-                  <h3 className="mb-1 text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>{s.name}</h3>
-                  <p className="mb-3 flex-1 text-xs leading-relaxed" style={{ color: 'var(--vc-white-dim)' }}>{s.description}</p>
+                  <h3
+                    className="mb-1 text-sm font-bold"
+                    style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}
+                  >
+                    {s.name}
+                  </h3>
+                  <p className="mb-3 flex-1 text-xs leading-relaxed" style={{ color: 'var(--vc-white-dim)' }}>
+                    {s.description}
+                  </p>
                   <button
                     onClick={() => setExpandedStrategy(isExpanded ? null : s.id)}
                     className="mb-3 flex items-center gap-1 text-[10px] font-semibold"
@@ -208,34 +163,50 @@ export default function MarketingPage() {
                   {isExpanded && (
                     <div className="mb-3 space-y-1.5">
                       {s.steps.map((step, i) => (
-                        <div key={i} className="flex items-start gap-2 text-[10px]" style={{ color: 'var(--vc-white-dim)' }}>
-                          <span className="shrink-0 font-mono font-bold" style={{ color: 'var(--vc-lime-main)' }}>{i + 1}.</span>
+                        <div
+                          key={i}
+                          className="flex items-start gap-2 text-[10px]"
+                          style={{ color: 'var(--vc-white-dim)' }}
+                        >
+                          <span
+                            className="shrink-0 font-mono font-bold"
+                            style={{ color: 'var(--vc-lime-main)' }}
+                          >
+                            {i + 1}.
+                          </span>
                           {step}
                         </div>
                       ))}
                     </div>
                   )}
-                  <button className="vc-btn-primary w-full py-2 text-xs">
-                    <Zap size={12} className="mr-1 inline" /> Activar estrategia
-                  </button>
+                  <Link
+                    href="/automatizaciones"
+                    className="vc-btn-primary flex w-full items-center justify-center gap-1 py-2 text-xs"
+                  >
+                    <Zap size={12} /> Ir a Automatizaciones
+                  </Link>
                 </div>
               )
             })}
           </div>
         </div>
 
-        {/* ── Generador de contenido ─────────────────── */}
+        {/* ── Generador de contenido AI ────────────── */}
         <div className="vc-card">
           <h2 className="heading-sm mb-4 flex items-center gap-2">
-            <Sparkles size={16} color="var(--vc-lime-main)" /> Generador de contenido
+            <Sparkles size={16} color="var(--vc-lime-main)" /> Generador de contenido AI
           </h2>
 
-          {/* Tabs de tipo */}
           <div className="mb-4 flex gap-1 rounded-lg p-1" style={{ background: 'var(--vc-black-soft)' }}>
             {TABS.map((t) => (
               <button
                 key={t.key}
-                onClick={() => setActiveTab(t.key)}
+                onClick={() => {
+                  setActiveTab(t.key)
+                  setContent('')
+                  setGenError(null)
+                  setWarning(null)
+                }}
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-bold transition-all"
                 style={{
                   background: activeTab === t.key ? 'var(--vc-black-mid)' : 'transparent',
@@ -249,61 +220,135 @@ export default function MarketingPage() {
             ))}
           </div>
 
-          {/* Input de tema */}
-          <div className="mb-4 flex gap-2">
+          <div className="mb-4 flex flex-wrap gap-2">
             <input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
               placeholder="Ej: colágeno hidrolizado, kit detox, proteína vegana..."
-              className="flex-1 rounded-lg px-4 py-3 text-sm outline-none"
-              style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-soft)' }}
+              maxLength={200}
+              className="flex-1 min-w-[240px] rounded-lg px-4 py-3 text-sm outline-none"
+              style={{
+                background: 'var(--vc-black-soft)',
+                border: '1px solid var(--vc-gray-dark)',
+                color: 'var(--vc-white-soft)',
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
             />
-            <button onClick={handleGenerate} disabled={generating} className="vc-btn-primary flex items-center gap-2 px-5 text-xs disabled:opacity-50">
+            <button
+              onClick={handleGenerate}
+              disabled={generating || !topic.trim()}
+              className="vc-btn-primary flex items-center gap-2 px-5 text-xs disabled:opacity-50"
+            >
               {generating ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
-              Generar
+              {generating ? 'Generando...' : 'Generar'}
             </button>
           </div>
 
-          {/* Contenido generado */}
-          <div className="relative rounded-xl p-4" style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)' }}>
-            <pre className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-body)' }}>
-              {DEMO_CONTENT[activeTab]}
-            </pre>
-            <button
-              onClick={() => copyContent(DEMO_CONTENT[activeTab])}
-              className="absolute right-3 top-3 flex items-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all"
-              style={{
-                background: copied ? 'rgba(198,255,60,0.15)' : 'var(--vc-black-mid)',
-                color: copied ? 'var(--vc-lime-main)' : 'var(--vc-white-dim)',
-                border: '1px solid var(--vc-gray-dark)',
-                fontFamily: 'var(--font-heading)',
-              }}
+          {warning && (
+            <div
+              className="mb-3 flex items-center gap-2 rounded-lg p-3 text-[11px]"
+              style={{ background: 'rgba(255,184,0,0.1)', border: '1px solid rgba(255,184,0,0.3)', color: 'var(--vc-warning)' }}
             >
-              {copied ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar</>}
-            </button>
+              <AlertCircle size={14} />
+              {warning}
+            </div>
+          )}
+
+          {genError && (
+            <p className="mb-3 text-xs" style={{ color: 'var(--vc-error)' }}>
+              {genError}
+            </p>
+          )}
+
+          <div
+            className="relative rounded-xl p-4"
+            style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)', minHeight: 180 }}
+          >
+            {content ? (
+              <>
+                <pre
+                  className="whitespace-pre-wrap text-sm leading-relaxed"
+                  style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-body)' }}
+                >
+                  {content}
+                </pre>
+                <button
+                  onClick={() => copyContent(content)}
+                  className="absolute right-3 top-3 flex items-center gap-1 rounded-lg px-3 py-1.5 text-[10px] font-bold transition-all"
+                  style={{
+                    background: copied ? 'rgba(198,255,60,0.15)' : 'var(--vc-black-mid)',
+                    color: copied ? 'var(--vc-lime-main)' : 'var(--vc-white-dim)',
+                    border: '1px solid var(--vc-gray-dark)',
+                    fontFamily: 'var(--font-heading)',
+                  }}
+                >
+                  {copied ? (
+                    <>
+                      <Check size={12} /> Copiado
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={12} /> Copiar
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <Sparkles size={24} className="mb-2 opacity-30" style={{ color: 'var(--vc-white-dim)' }} />
+                <p className="text-xs" style={{ color: 'var(--vc-gray-mid)' }}>
+                  Escribe un producto o tema arriba y genera {TABS.find((t) => t.key === activeTab)?.label.toLowerCase()}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── Calendario semanal ─────────────────────── */}
+        {/* ── Calendario ─────────────────────────────── */}
         <div className="vc-card">
           <h2 className="heading-sm mb-4 flex items-center gap-2">
             <Calendar size={16} color="var(--vc-lime-main)" /> Calendario semanal sugerido
           </h2>
           <div className="space-y-2">
             {WEEKLY_CALENDAR.map((day) => (
-              <div key={day.day} className="flex items-center gap-4 rounded-lg p-3" style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)' }}>
+              <div
+                key={day.day}
+                className="flex items-center gap-4 rounded-lg p-3"
+                style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)' }}
+              >
                 <div className="w-20 shrink-0">
-                  <p className="text-xs font-bold" style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-heading)' }}>{day.day}</p>
-                  <p className="text-[10px]" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>{day.time}</p>
+                  <p
+                    className="text-xs font-bold"
+                    style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-heading)' }}
+                  >
+                    {day.day}
+                  </p>
+                  <p
+                    className="text-[10px]"
+                    style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}
+                  >
+                    {day.time}
+                  </p>
                 </div>
                 <span className="shrink-0 text-sm">{day.type.split(' ')[0]}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium" style={{ color: 'var(--vc-white-soft)' }}>{day.content}</p>
+                  <p className="text-xs font-medium" style={{ color: 'var(--vc-white-soft)' }}>
+                    {day.content}
+                  </p>
                   {day.hashtags && (
-                    <p className="mt-0.5 text-[10px]" style={{ color: 'var(--vc-lime-deep)', fontFamily: 'var(--font-mono)' }}>{day.hashtags}</p>
+                    <p
+                      className="mt-0.5 text-[10px]"
+                      style={{ color: 'var(--vc-lime-deep)', fontFamily: 'var(--font-mono)' }}
+                    >
+                      {day.hashtags}
+                    </p>
                   )}
                 </div>
-                <button onClick={() => copyContent(`${day.content}\n${day.hashtags}`)} style={{ color: 'var(--vc-gray-mid)' }}>
+                <button
+                  onClick={() => copyContent(`${day.content}\n${day.hashtags}`)}
+                  aria-label="Copiar"
+                  style={{ color: 'var(--vc-gray-mid)' }}
+                >
                   <Copy size={14} />
                 </button>
               </div>
@@ -313,16 +358,18 @@ export default function MarketingPage() {
 
         {/* ── Insights ───────────────────────────────── */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[
-            { icon: Star, title: 'Mejor producto', text: 'Colágeno Hidrolizado — 43% de ventas', color: 'var(--vc-lime-main)' },
-            { icon: Calendar, title: 'Mejor hora', text: 'Publicar a las 10am y 6pm da 2x engagement', color: 'var(--vc-info)' },
-            { icon: TrendingUp, title: 'Presupuesto ads', text: 'Con $50K COP/día en Meta Ads alcanzas 5K personas', color: 'var(--vc-warning)' },
-            { icon: Megaphone, title: 'Próxima acción', text: 'Publica 3 reels esta semana — es lo que más convierte', color: 'var(--vc-lime-main)' },
-          ].map((ins) => (
+          {INSIGHTS.map((ins) => (
             <div key={ins.title} className="vc-card">
               <ins.icon size={18} style={{ color: ins.color }} className="mb-2" />
-              <p className="mb-1 text-xs font-bold" style={{ color: ins.color, fontFamily: 'var(--font-heading)' }}>{ins.title}</p>
-              <p className="text-[11px] leading-relaxed" style={{ color: 'var(--vc-white-dim)' }}>{ins.text}</p>
+              <p
+                className="mb-1 text-xs font-bold"
+                style={{ color: ins.color, fontFamily: 'var(--font-heading)' }}
+              >
+                {ins.title}
+              </p>
+              <p className="text-[11px] leading-relaxed" style={{ color: 'var(--vc-white-dim)' }}>
+                {ins.text}
+              </p>
             </div>
           ))}
         </div>
