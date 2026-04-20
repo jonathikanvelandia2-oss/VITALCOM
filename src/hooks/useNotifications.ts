@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 export type Notification = {
   id: string
   type: 'ORDER_STATUS' | 'ORDER_NEW' | 'INBOX_MESSAGE' | 'INBOX_ASSIGNED' |
-        'COMMUNITY_LIKE' | 'COMMUNITY_REPLY' | 'STORE_CONNECTED' | 'SYSTEM'
+        'COMMUNITY_LIKE' | 'COMMUNITY_REPLY' | 'COMMUNITY_DM' | 'STORE_CONNECTED' | 'SYSTEM'
   title: string
   body: string | null
   link: string | null

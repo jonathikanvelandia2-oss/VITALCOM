@@ -18,6 +18,7 @@ const ICONS: Record<Notification['type'], typeof Bell> = {
   INBOX_ASSIGNED: MessageSquare,
   COMMUNITY_LIKE: Heart,
   COMMUNITY_REPLY: AtSign,
+  COMMUNITY_DM: MessageSquare,
   STORE_CONNECTED: Store,
   SYSTEM: AlertCircle,
 }
