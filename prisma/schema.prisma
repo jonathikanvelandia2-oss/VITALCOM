@@ -133,6 +133,7 @@ model User {
   conversationsB   Conversation[]      @relation("ConversationUserB")
   directMessages   DirectMessage[]     @relation("DirectMessageSender")
   workflowActivations UserWorkflowActivation[]
+  adAccounts       AdAccount[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -552,6 +553,86 @@ model FinanceEntry {
   @@index([userId, date])
   @@index([userId, type, category])
   @@index([relatedOrderId])
+}
+
+// ─────────────────────────────────────────────────────────
+// PUBLICIDAD (Meta / TikTok / Google Ads / Manual)
+// ─────────────────────────────────────────────────────────
+// Fase V2 del plan estratégico. Foundation que funciona con
+// entrada manual hoy y queda lista para OAuth cuando lleguen
+// credenciales.
+//
+// Cada AdSpendEntry genera automáticamente un FinanceEntry
+// (EGRESO/PUBLICIDAD) para alimentar el P&G del dropshipper.
+
+enum AdPlatform {
+  META
+  TIKTOK
+  GOOGLE
+  OTHER              // Prensa, influencers, OOH — gastos no digitales
+}
+
+model AdAccount {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform    AdPlatform
+  accountId   String                           // ID externo (Meta/TikTok/Google) o label libre
+  accountName String?
+  currency    String     @default("COP")
+  connected   Boolean    @default(false)       // false = manual, true = OAuth conectado
+  accessToken String?                          // Cuando llegue OAuth real
+  refreshToken String?
+  tokenExpiresAt DateTime?
+  lastSyncAt  DateTime?
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  campaigns    AdCampaign[]
+  spendEntries AdSpendEntry[]
+
+  @@unique([userId, platform, accountId])
+  @@index([userId])
+}
+
+model AdCampaign {
+  id          String     @id @default(cuid())
+  accountId   String
+  account     AdAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  externalId  String?                         // ID en la plataforma (cuando OAuth)
+  name        String
+  objective   String?                         // CONVERSIONS, TRAFFIC, AWARENESS, LEADS
+  status      String     @default("ACTIVE")   // ACTIVE, PAUSED, ENDED
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  spendEntries AdSpendEntry[]
+
+  @@index([accountId])
+}
+
+model AdSpendEntry {
+  id             String     @id @default(cuid())
+  accountId      String
+  account        AdAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  campaignId     String?
+  campaign       AdCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  date           DateTime   @db.Date
+  spend          Float                         // Gasto en la moneda de la cuenta
+  impressions    Int?
+  clicks         Int?
+  conversions    Int?
+  source         String     @default("MANUAL") // MANUAL, API_SYNC
+  financeEntryId String?    @unique            // Link al FinanceEntry auto-generado
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([accountId, date])
+  @@index([campaignId, date])
 }
 
 // ─────────────────────────────────────────────────────────
