@@ -137,6 +137,7 @@ model User {
   campaignDrafts   CampaignDraft[]
   campaignRecommendations CampaignRecommendation[]
   adCreatives      AdCreative[]
+  storeOptimizations StoreOptimization[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -191,6 +192,7 @@ model Product {
   shopifySync      ProductSync[]
   campaignDrafts   CampaignDraft[]
   adCreatives      AdCreative[]
+  storeOptimizations StoreOptimization[]
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 }
@@ -936,4 +938,68 @@ model AdCreative {
 
   @@index([userId, productId])
   @@index([userId, status])
+}
+
+// ─────────────────────────────────────────────────────────
+// OPTIMIZADOR DE TIENDA IA (V18) — Recomendaciones de catálogo
+// ─────────────────────────────────────────────────────────
+// Analiza el catálogo de productos Vitalcom + tienda Shopify del
+// dropshipper + ventas + P&G y sugiere acciones concretas:
+// qué productos destacar, pricing, copy de landing, cross-sell.
+// Cada recomendación es accionable con 1 clic (aplicar/dismiss).
+
+enum OptimizationType {
+  HIGHLIGHT_PRODUCT    // Destacar producto ganador en home/tienda
+  PRICING_ADJUSTMENT   // Subir/bajar precio de venta
+  LANDING_COPY         // Mejorar copy de landing del producto
+  CROSS_SELL           // Agregar cross-sell a producto X con Y
+  PRODUCT_MIX          // Añadir/quitar producto del catálogo
+  MARGIN_IMPROVEMENT   // Producto con margen bajo → optimizar
+  RESTOCK_URGENT       // Stock bajo, restock antes que se agote
+  REMOVE_UNDERPERFORMER // Producto sin ventas → remover
+}
+
+enum OptimizationStatus {
+  PENDING
+  APPLIED
+  DISMISSED
+  EXPIRED
+}
+
+model StoreOptimization {
+  id            String             @id @default(cuid())
+  userId        String
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId     String?
+  product       Product?           @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  type          OptimizationType
+  status        OptimizationStatus @default(PENDING)
+  priority      Int                @default(50)        // 0 (baja) - 100 (crítica)
+
+  title         String                                  // "Destaca Colágeno Premium en tu home"
+  reasoning     String                                  // Por qué IA lo recomienda
+  actionLabel   String                                  // "Destacar", "Ajustar precio", "Ver copy"
+  suggestedValue Float?                                 // Precio sugerido, % cambio, etc.
+  suggestedText String?                                 // Copy nuevo, sugerencia textual
+  suggestedData Json?                                   // Payload flexible (cross-sell targets, etc.)
+
+  // Snapshot de métricas al generar
+  salesLast30   Int?
+  revenueLast30 Float?
+  marginPct     Float?
+  stockLevel    Int?
+  conversionRate Float?
+  confidence    Float?             @default(0.7)       // 0-1 certeza del modelo
+
+  // Resultado
+  appliedAt     DateTime?
+  dismissedAt   DateTime?
+  expiresAt     DateTime                                // Recomendaciones caducan en 14d
+
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([userId, status])
+  @@index([productId])
 }
