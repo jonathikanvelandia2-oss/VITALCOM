@@ -335,7 +335,7 @@ function RecommendationCard({ rec, isHistory }: { rec: CampaignRecommendation; i
 
               {rec.type === 'TEST_CREATIVE' && rec.campaignId && (
                 <Link
-                  href="/lanzador"
+                  href="/creativo"
                   className="flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-bold uppercase"
                   style={{
                     background: 'var(--vc-black-soft)',
@@ -344,7 +344,7 @@ function RecommendationCard({ rec, isHistory }: { rec: CampaignRecommendation; i
                     fontFamily: 'var(--font-heading)',
                   }}
                 >
-                  <Sparkles size={12} /> Lanzar variante
+                  <Sparkles size={12} /> Generar variantes IA
                 </Link>
               )}
 

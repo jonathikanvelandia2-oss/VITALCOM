@@ -136,6 +136,7 @@ model User {
   adAccounts       AdAccount[]
   campaignDrafts   CampaignDraft[]
   campaignRecommendations CampaignRecommendation[]
+  adCreatives      AdCreative[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -189,6 +190,7 @@ model Product {
   orderItems       OrderItem[]
   shopifySync      ProductSync[]
   campaignDrafts   CampaignDraft[]
+  adCreatives      AdCreative[]
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 }
@@ -866,4 +868,72 @@ model CampaignRecommendation {
 
   @@index([userId, status])
   @@index([campaignId])
+}
+
+// ─────────────────────────────────────────────────────────
+// CREATIVO MAKER IA (V17) — Generador de creativos para ads
+// ─────────────────────────────────────────────────────────
+// Genera variantes de copy + imagen para cada producto, con
+// múltiples ángulos (beneficio, dolor, urgencia, etc.).
+// Cada creativo se puede lanzar directamente desde el Lanzador.
+
+enum CreativeAngle {
+  BENEFIT            // Destaca beneficio principal
+  PAIN_POINT         // Dolor del cliente resuelto
+  SOCIAL_PROOF       // Testimonios / números
+  URGENCY            // Escasez / oferta
+  LIFESTYLE          // Estilo de vida aspiracional
+  TESTIMONIAL        // Caso real
+  BEFORE_AFTER       // Transformación
+  PROBLEM_SOLUTION   // Problema → producto
+}
+
+enum CreativeStatus {
+  GENERATING
+  READY
+  FAILED
+}
+
+enum CreativeRatio {
+  SQUARE             // 1:1 — feed Meta/TikTok
+  PORTRAIT           // 4:5 — feed vertical
+  STORY              // 9:16 — stories/reels
+  LANDSCAPE          // 16:9 — YouTube/Display
+}
+
+model AdCreative {
+  id            String          @id @default(cuid())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  angle         CreativeAngle
+  platform      AdPlatform      @default(META)
+  ratio         CreativeRatio   @default(SQUARE)
+  status        CreativeStatus  @default(READY)
+
+  // Copy generado
+  headline      String
+  primaryText   String
+  description   String?
+  cta           String?         @default("BUY_NOW")
+  hashtags      String[]
+
+  // Imagen (URL Cloudinary o DALL-E)
+  imageUrl      String?
+  imagePrompt   String?         // Prompt usado para generar la imagen
+
+  // Meta del creativo
+  score         Int             @default(70)           // Predicción IA 0-100
+  reasoning     String?                                 // Por qué IA eligió este ángulo
+  isFavorite    Boolean         @default(false)
+  timesUsed     Int             @default(0)            // Veces lanzado a Lanzador
+  lastUsedAt    DateTime?
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([userId, productId])
+  @@index([userId, status])
 }
