@@ -1,14 +1,16 @@
 import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, withErrorHandler } from '@/lib/api/response'
-import { requireRole, requireSession } from '@/lib/auth/session'
+import { requireRole } from '@/lib/auth/session'
 import { z } from 'zod'
 
+export const dynamic = 'force-dynamic'
+
 const createDocSchema = z.object({
-  name: z.string().min(1),
-  folder: z.enum(['general', 'legal', 'marketing', 'logistica']).default('general'),
-  type: z.string().min(1),
+  name: z.string().min(1).max(255),
+  folder: z.string().min(1).max(80),
+  type: z.string().min(1).max(20),
   url: z.string().url(),
-  size: z.number().default(0),
+  size: z.number().int().min(0).default(0),
 })
 
 // ── GET /api/admin/documents — Documentos internos ─────
@@ -18,43 +20,51 @@ export const GET = withErrorHandler(async (req: Request) => {
   const url = new URL(req.url)
   const folder = url.searchParams.get('folder') || undefined
 
-  const where: any = {}
-  if (folder) where.folder = folder
-
   const documents = await prisma.document.findMany({
-    where,
-    include: { uploader: { select: { name: true, avatar: true } } },
+    where: folder ? { folder } : {},
+    include: { uploader: { select: { id: true, name: true, avatar: true } } },
     orderBy: { createdAt: 'desc' },
   })
 
-  // Agrupar por carpeta
-  const folders: Record<string, typeof documents> = {}
-  for (const doc of documents) {
-    if (!folders[doc.folder]) folders[doc.folder] = []
-    folders[doc.folder].push(doc)
-  }
+  const byFolder = new Map<string, number>()
+  for (const d of documents) byFolder.set(d.folder, (byFolder.get(d.folder) ?? 0) + 1)
 
-  return apiSuccess({ documents, folders })
+  return apiSuccess({
+    items: documents.map((d) => ({
+      id: d.id,
+      name: d.name,
+      folder: d.folder,
+      type: d.type,
+      url: d.url,
+      size: d.size,
+      uploader: d.uploader,
+      createdAt: d.createdAt,
+    })),
+    folders: Array.from(byFolder.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  })
 })
 
-// ── POST /api/admin/documents — Subir documento ───────
+// ── POST /api/admin/documents — Registrar documento ────
+// Se asume que el archivo ya fue subido (Supabase Storage, S3,
+// Cloudinary, etc.) y se provee la URL pública + tamaño en bytes.
 export const POST = withErrorHandler(async (req: Request) => {
   const session = await requireRole('EMPLOYEE')
   const body = await req.json()
   const data = createDocSchema.parse(body)
 
   const doc = await prisma.document.create({
-    data: { ...data, uploadedBy: session.id } as any,
+    data: { ...data, uploadedBy: session.id },
   })
 
-  return apiSuccess(doc, 201)
-})
-
-// ── DELETE /api/admin/documents — Eliminar documento ───
-export const DELETE = withErrorHandler(async (req: Request) => {
-  await requireRole('ADMIN')
-  const { id } = await req.json()
-
-  await prisma.document.delete({ where: { id } })
-  return apiSuccess({ deleted: true })
+  return apiSuccess({
+    id: doc.id,
+    name: doc.name,
+    folder: doc.folder,
+    type: doc.type,
+    url: doc.url,
+    size: doc.size,
+    createdAt: doc.createdAt,
+  }, 201)
 })

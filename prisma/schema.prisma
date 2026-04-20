@@ -132,6 +132,7 @@ model User {
   conversationsA   Conversation[]      @relation("ConversationUserA")
   conversationsB   Conversation[]      @relation("ConversationUserB")
   directMessages   DirectMessage[]     @relation("DirectMessageSender")
+  workflowActivations UserWorkflowActivation[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -365,14 +366,42 @@ model WorkflowTemplate {
   id          String   @id @default(cuid())
   userId      String?
   user        User?    @relation(fields: [userId], references: [id])
+  slug        String?  @unique             // Identificador legible para plantillas oficiales (ej: confirm-order)
   name        String
   description String?
+  emoji       String?
   category    String
+  target      String?                       // Audiencia del flujo (Nuevos pedidos, Leads, etc.)
+  impact      String?                       // Etiqueta de resultado esperado
   steps       Json
   isPublic    Boolean  @default(false)
   uses        Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  activations UserWorkflowActivation[]
+}
+
+enum WorkflowStatus {
+  ACTIVE
+  PAUSED
+}
+
+model UserWorkflowActivation {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templateId  String
+  template    WorkflowTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  status      WorkflowStatus @default(ACTIVE)
+  executions  Int            @default(0)
+  successCount Int           @default(0)
+  lastRunAt   DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([userId, templateId])
+  @@index([userId])
 }
 
 // ─────────────────────────────────────────────────────────
