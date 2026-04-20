@@ -444,15 +444,50 @@ function CreateStoreView() {
           </div>
         )}
 
-        {/* Conectar tienda existente */}
-        <div className="vc-card">
-          <h3 className="mb-3 text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
-            Conectar tienda existente
-          </h3>
+        {/* Conectar tienda: OAuth real (recomendado) */}
+        <div className="vc-card" style={{ borderColor: 'rgba(198, 255, 60, 0.3)' }}>
+          <div className="mb-3 flex items-center gap-2">
+            <span className="rounded px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+              style={{ background: 'var(--vc-lime-main)', color: 'var(--vc-black)', fontFamily: 'var(--font-heading)' }}>
+              Recomendado
+            </span>
+            <h3 className="text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
+              Conectar con Shopify (OAuth seguro)
+            </h3>
+          </div>
           <p className="mb-4 text-xs" style={{ color: 'var(--vc-white-dim)' }}>
-            Si ya tienes Shopify, pega tu dominio para conectarlo con Vitalcom.
+            Autoriza a Vitalcom dentro de tu admin de Shopify. Sincronización automática de productos y pedidos.
           </p>
-          <div className="space-y-3">
+          <div className="flex gap-3">
+            <input value={domain} onChange={(e) => setDomain(e.target.value)}
+              placeholder="mi-tienda.myshopify.com"
+              className="flex-1 rounded-lg px-4 py-2.5 text-xs outline-none"
+              style={{ background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-soft)' }} />
+            <a
+              href={domain.includes('.myshopify.com') ? `/api/shopify/install?shop=${encodeURIComponent(domain)}` : '#'}
+              aria-disabled={!domain.includes('.myshopify.com')}
+              onClick={(e) => { if (!domain.includes('.myshopify.com')) e.preventDefault() }}
+              className="vc-btn-primary flex items-center gap-2 text-xs"
+              style={{ opacity: domain.includes('.myshopify.com') ? 1 : 0.5, pointerEvents: domain.includes('.myshopify.com') ? 'auto' : 'none' }}
+            >
+              <Rocket size={14} />
+              Autorizar
+            </a>
+          </div>
+          <p className="mt-2 text-[10px]" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>
+            Serás redirigido a Shopify para autorizar permisos de productos, pedidos e inventario.
+          </p>
+        </div>
+
+        {/* Alternativa manual (modo QA / testing sin OAuth) */}
+        <details className="vc-card" style={{ padding: '1rem' }}>
+          <summary className="cursor-pointer text-xs font-semibold" style={{ color: 'var(--vc-white-dim)', fontFamily: 'var(--font-heading)' }}>
+            Conectar manualmente (avanzado)
+          </summary>
+          <div className="mt-4 space-y-3">
+            <p className="text-[11px]" style={{ color: 'var(--vc-gray-mid)' }}>
+              Solo úsalo si tu tienda ya está autorizada o para pruebas internas.
+            </p>
             <input value={storeName} onChange={(e) => setStoreName(e.target.value)}
               placeholder="Nombre de tu tienda"
               className="w-full rounded-lg px-4 py-2.5 text-xs outline-none"
@@ -465,14 +500,14 @@ function CreateStoreView() {
               <button onClick={handleConnect} disabled={connectStore.isPending || !domain.includes('.myshopify.com')}
                 className="vc-btn-primary flex items-center gap-2 text-xs">
                 {connectStore.isPending ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />}
-                Conectar
+                Conectar manual
               </button>
             </div>
             {connectStore.isError && (
               <p className="text-xs" style={{ color: 'var(--vc-error)' }}>{(connectStore.error as Error).message}</p>
             )}
           </div>
-        </div>
+        </details>
       </div>
     </>
   )
