@@ -58,11 +58,34 @@ export const GET = withErrorHandler(async (req: Request) => {
     prisma.user.count({ where }),
   ])
 
-  const mapped = users.map(u => ({
+  // LTV + último pedido en un solo groupBy (evita N+1).
+  const userIds = users.map((u) => u.id)
+  let spentByUser = new Map<string, number>()
+  let lastOrderByUser = new Map<string, Date>()
+  if (userIds.length > 0) {
+    const orderAggs = await prisma.order.groupBy({
+      by: ['userId'],
+      where: {
+        userId: { in: userIds },
+        status: { notIn: ['CANCELLED', 'RETURNED'] },
+      },
+      _sum: { total: true },
+      _max: { createdAt: true },
+    })
+    for (const agg of orderAggs) {
+      if (!agg.userId) continue
+      spentByUser.set(agg.userId, agg._sum.total ?? 0)
+      if (agg._max.createdAt) lastOrderByUser.set(agg.userId, agg._max.createdAt)
+    }
+  }
+
+  const mapped = users.map((u) => ({
     ...u,
     orderCount: u._count.orders,
     postCount: u._count.posts,
     _count: undefined,
+    totalSpent: spentByUser.get(u.id) ?? 0,
+    lastOrderAt: lastOrderByUser.get(u.id) ?? null,
   }))
 
   return apiSuccess({
