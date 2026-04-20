@@ -661,6 +661,7 @@ enum NotificationType {
   COMMUNITY_REPLY   // Respuesta a tu comentario
   COMMUNITY_DM      // Mensaje directo 1:1 en comunidad
   STORE_CONNECTED   // Tienda Shopify conectada
+  AI_ACTION         // V20 — Acción IA crítica del Command Center
   SYSTEM            // Anuncios de plataforma
 }
 

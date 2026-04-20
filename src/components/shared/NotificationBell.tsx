@@ -3,9 +3,12 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  Bell, Package, MessageSquare, Store, Heart, AtSign, AlertCircle, CheckCheck,
+  Bell, Package, MessageSquare, Store, Heart, AtSign, AlertCircle, CheckCheck, Sparkles,
 } from 'lucide-react'
-import { useNotifications, useMarkNotificationRead, useMarkAllRead, type Notification } from '@/hooks/useNotifications'
+import {
+  useNotifications, useMarkNotificationRead, useMarkAllRead, useSyncAiCritical,
+  type Notification,
+} from '@/hooks/useNotifications'
 
 // ── Bell de notificaciones ─────────────────────────────
 // Dropdown compacto que muestra últimas 15 notificaciones
@@ -20,6 +23,7 @@ const ICONS: Record<Notification['type'], typeof Bell> = {
   COMMUNITY_REPLY: AtSign,
   COMMUNITY_DM: MessageSquare,
   STORE_CONNECTED: Store,
+  AI_ACTION: Sparkles,
   SYSTEM: AlertCircle,
 }
 
@@ -39,8 +43,17 @@ export function NotificationBell() {
   const { data } = useNotifications()
   const markRead = useMarkNotificationRead()
   const markAll = useMarkAllRead()
+  const syncAi = useSyncAiCritical()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+
+  // V20 — sync pasivo de críticos IA al montar + cada 5 min
+  useEffect(() => {
+    syncAi.mutate()
+    const id = setInterval(() => syncAi.mutate(), 5 * 60 * 1000)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     function onClick(e: MouseEvent) {

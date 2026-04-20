@@ -3,6 +3,7 @@ import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { generateRecommendations } from '@/lib/ai/agents/media-buyer'
 import { generateOptimizations } from '@/lib/ai/agents/store-optimizer'
+import { syncCriticalToNotifications } from '@/lib/ai/notify-critical'
 
 export const dynamic = 'force-dynamic'
 
@@ -100,6 +101,9 @@ export const POST = withErrorHandler(async () => {
     })
   }
 
+  // V20 — sync críticas a bell de notificaciones
+  const notifSync = await syncCriticalToNotifications(session.id)
+
   return apiSuccess({
     mediaBuyer: {
       created: mbToCreate.length,
@@ -109,6 +113,7 @@ export const POST = withErrorHandler(async () => {
       created: soToCreate.length,
       total: soRes.optimizations.length,
     },
+    notifications: notifSync,
     totalNew: mbToCreate.length + soToCreate.length,
   })
 })

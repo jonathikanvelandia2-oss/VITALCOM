@@ -7,7 +7,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 export type Notification = {
   id: string
   type: 'ORDER_STATUS' | 'ORDER_NEW' | 'INBOX_MESSAGE' | 'INBOX_ASSIGNED' |
-        'COMMUNITY_LIKE' | 'COMMUNITY_REPLY' | 'COMMUNITY_DM' | 'STORE_CONNECTED' | 'SYSTEM'
+        'COMMUNITY_LIKE' | 'COMMUNITY_REPLY' | 'COMMUNITY_DM' | 'STORE_CONNECTED' |
+        'AI_ACTION' | 'SYSTEM'
   title: string
   body: string | null
   link: string | null
@@ -57,5 +58,20 @@ export function useMarkAllRead() {
   return useMutation({
     mutationFn: () => fetchJson('/api/notifications/read-all', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  })
+}
+
+/** V20 — Sync pasivo Command Center críticos → bell. Corre 1x al montar
+ * el bell + cada 5 min. Sin efecto si no hay críticos nuevos (dedup 24h). */
+export function useSyncAiCritical() {
+  const qc = useQueryClient()
+  return useMutation<{ created: number; total: number }, Error, void>({
+    mutationFn: () =>
+      fetchJson('/api/ai/command-center/sync-notifications', { method: 'POST' }),
+    onSuccess: (data) => {
+      if (data.created > 0) {
+        qc.invalidateQueries({ queryKey: ['notifications'] })
+      }
+    },
   })
 }
