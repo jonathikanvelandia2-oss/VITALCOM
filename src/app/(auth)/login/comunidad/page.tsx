@@ -133,7 +133,7 @@ export default function LoginComunidadPage() {
               Recordarme
             </label>
             <Link
-              href="#"
+              href="/forgot-password"
               style={{
                 color: 'var(--vc-lime-main)',
                 fontFamily: 'var(--font-heading)',

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db/prisma'
 import { registerSchema } from '@/lib/auth/schemas'
 import { hashPassword } from '@/lib/security/password'
 import { rateLimit, RATE_LIMITS, rateLimitHeaders } from '@/lib/security/rate-limit'
+import { sendWelcomeEmail } from '@/lib/email'
 import { ZodError } from 'zod'
 
 // ── POST /api/auth/register ─────────────────────────────
@@ -57,6 +58,12 @@ export async function POST(req: Request) {
         name: true,
         role: true,
       },
+    })
+
+    // Fire-and-forget: welcome email. Si Resend no está configurado o falla,
+    // el registro ya fue exitoso y el error queda en logs para operaciones.
+    sendWelcomeEmail(user.email, { name: user.name || 'Vitalcommer' }).catch((err) => {
+      console.error('[register] welcome email failed', err)
     })
 
     return NextResponse.json(

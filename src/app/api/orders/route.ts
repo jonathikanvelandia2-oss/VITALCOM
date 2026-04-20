@@ -3,6 +3,7 @@ import { apiSuccess, apiError, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { createOrderSchema, orderFiltersSchema } from '@/lib/api/schemas/order'
 import { OrderRepository } from '@/lib/repositories/order-repository'
+import { sendOrderConfirmationEmail } from '@/lib/email'
 import { Prisma } from '@prisma/client'
 
 // ── GET /api/orders — Listado paginado con filtros ──────
@@ -106,5 +107,25 @@ export const POST = withErrorHandler(async (req: Request) => {
   })
 
   OrderRepository.invalidateAll()
+
+  // Fire-and-forget: confirmación al cliente final. Solo si dio email real.
+  if (order.customerEmail) {
+    sendOrderConfirmationEmail(order.customerEmail, {
+      orderNumber: order.number,
+      customerName: order.customerName,
+      country: order.country,
+      items: order.items.map((it) => ({
+        name: it.product.name,
+        quantity: it.quantity,
+        total: it.total,
+      })),
+      subtotal: order.subtotal,
+      shipping: order.shipping,
+      total: order.total,
+    }).catch((err) => {
+      console.error('[orders] order confirmation email failed', { orderNumber: order.number, err })
+    })
+  }
+
   return apiSuccess(order, 201)
 })

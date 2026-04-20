@@ -5,8 +5,13 @@ import { getToken } from 'next-auth/jwt'
 // ── Middleware de Vitalcom ───────────────────────────────
 // DESARROLLO/TESTING: Pasa todo sin restricción.
 // PRODUCCIÓN: Verifica JWT real de NextAuth, protege rutas por rol.
+//
+// IMPORTANTE: el bypass de dev ya NO depende de NODE_ENV (frágil,
+// puede activarse accidentalmente en Vercel preview). Ahora requiere
+// flag explícito VITALCOM_DEV_BYPASS=true. Si el flag no está presente,
+// el middleware aplica protección completa aunque NODE_ENV sea development.
 
-const IS_DEV = process.env.NODE_ENV !== 'production'
+const IS_DEV_BYPASS = process.env.VITALCOM_DEV_BYPASS === 'true'
 const IS_TESTING = process.env.NEXT_PUBLIC_TESTING_MODE === 'true'
 
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'MANAGER_AREA', 'EMPLOYEE']
@@ -31,9 +36,11 @@ const PUBLIC_API_ROUTES = ['/api/public/']
 
 export async function middleware(request: NextRequest) {
   // ════════════════════════════════════════════════════════
-  // DESARROLLO — no bloquear nada
+  // DESARROLLO / TESTING — no bloquear nada
+  // Solo si el flag explícito VITALCOM_DEV_BYPASS=true (o TESTING_MODE)
+  // está presente. En producción debe estar ausente para activar RBAC real.
   // ════════════════════════════════════════════════════════
-  if (IS_DEV || IS_TESTING) {
+  if (IS_DEV_BYPASS || IS_TESTING) {
     return NextResponse.next()
   }
 
