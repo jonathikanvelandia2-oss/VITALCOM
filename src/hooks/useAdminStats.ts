@@ -17,3 +17,21 @@ export function useAdminStats(days = 7) {
     refetchInterval: 60000, // Refrescar cada minuto
   })
 }
+
+/** P&L consolidado Vitalcom (nivel empresa, no dropshipper) */
+export function useAdminFinance(days = 30) {
+  return useQuery({
+    queryKey: ['admin', 'finance', days],
+    queryFn: () => fetcher(`/api/admin/finance/overview?days=${days}`),
+    refetchInterval: 120000,
+  })
+}
+
+/** Métricas de adquisición + engagement comunidad */
+export function useAdminMarketing(days = 30) {
+  return useQuery({
+    queryKey: ['admin', 'marketing', days],
+    queryFn: () => fetcher(`/api/admin/marketing/overview?days=${days}`),
+    refetchInterval: 120000,
+  })
+}
