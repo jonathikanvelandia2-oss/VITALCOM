@@ -72,6 +72,19 @@ export function useUpdateOrderStatus() {
   })
 }
 
+/** Despachar pedido via Dropi — solo staff */
+export function useFulfillOrder() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => mutator(`/api/orders/${id}/fulfill`, 'POST'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['orders'] })
+      qc.invalidateQueries({ queryKey: ['order'] })
+      qc.invalidateQueries({ queryKey: ['orders-stats'] })
+    },
+  })
+}
+
 /** Cancelar pedido (dueño o staff) — shortcut de useUpdateOrderStatus */
 export function useCancelOrder() {
   const qc = useQueryClient()

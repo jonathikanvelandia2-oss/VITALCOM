@@ -1,8 +1,8 @@
 'use client'
 
-import { Truck, Package, CheckCircle, RotateCcw, Wifi, Loader2, Search } from 'lucide-react'
+import { Truck, Package, CheckCircle, RotateCcw, Wifi, Loader2, Search, Zap } from 'lucide-react'
 import { AdminTopbar } from '@/components/admin/AdminTopbar'
-import { useOrders, useUpdateOrderStatus } from '@/hooks/useOrders'
+import { useOrders, useUpdateOrderStatus, useFulfillOrder } from '@/hooks/useOrders'
 import { useState } from 'react'
 
 const STATUS_COLOR: Record<string, string> = {
@@ -119,10 +119,24 @@ export default function DespachosPage() {
 // ── Fila con acción de despacho ─────────────────────────
 function DispatchRow({ order }: { order: any }) {
   const updateStatus = useUpdateOrderStatus()
+  const fulfill = useFulfillOrder()
   const [tracking, setTracking] = useState(order.trackingCode ?? '')
+  const [mode, setMode] = useState<'auto' | 'manual'>('auto')
   const statusColor = STATUS_COLOR[order._dispatchStatus] ?? 'var(--vc-gray-mid)'
 
-  function handleDispatch() {
+  // Despacho automático vía Dropi. Si Dropi no está configurado (503),
+  // caemos al modo manual para que el admin pueda seguir operando.
+  function handleDispatchAuto() {
+    fulfill.mutate(order.id, {
+      onError: (err: Error) => {
+        if (err.message.includes('DROPI_NOT_CONFIGURED') || err.message.includes('no está configurado')) {
+          setMode('manual')
+        }
+      },
+    })
+  }
+
+  function handleDispatchManual() {
     updateStatus.mutate({
       id: order.id,
       data: {
@@ -139,6 +153,8 @@ function DispatchRow({ order }: { order: any }) {
       data: { status: 'DELIVERED' },
     })
   }
+
+  const isDispatching = fulfill.isPending || updateStatus.isPending
 
   const inputStyle = { background: 'var(--vc-black-soft)', border: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-soft)' }
 
@@ -167,11 +183,18 @@ function DispatchRow({ order }: { order: any }) {
         </span>
       </td>
       <td className="py-3 text-right">
-        {order._dispatchStatus === 'PROCESSING' && (
-          <button onClick={handleDispatch} disabled={updateStatus.isPending}
-            className="rounded-lg px-3 py-1 text-[10px] font-bold transition-colors"
+        {order._dispatchStatus === 'PROCESSING' && mode === 'auto' && (
+          <button onClick={handleDispatchAuto} disabled={isDispatching}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-[10px] font-bold transition-colors"
             style={{ background: 'rgba(198,255,60,0.12)', color: 'var(--vc-lime-main)', fontFamily: 'var(--font-heading)' }}>
-            {updateStatus.isPending ? 'Enviando...' : 'Despachar'}
+            <Zap size={10} /> {isDispatching ? 'Enviando...' : 'Despachar Dropi'}
+          </button>
+        )}
+        {order._dispatchStatus === 'PROCESSING' && mode === 'manual' && (
+          <button onClick={handleDispatchManual} disabled={isDispatching}
+            className="rounded-lg px-3 py-1 text-[10px] font-bold transition-colors"
+            style={{ background: 'rgba(255,184,0,0.12)', color: 'var(--vc-warning)', fontFamily: 'var(--font-heading)' }}>
+            {isDispatching ? 'Guardando...' : 'Despachar manual'}
           </button>
         )}
         {order._dispatchStatus === 'DISPATCHED' && (
