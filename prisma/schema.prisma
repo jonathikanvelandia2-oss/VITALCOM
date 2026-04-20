@@ -138,6 +138,7 @@ model User {
   campaignRecommendations CampaignRecommendation[]
   adCreatives      AdCreative[]
   storeOptimizations StoreOptimization[]
+  appliedActions   AppliedAction[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1003,4 +1004,52 @@ model StoreOptimization {
 
   @@index([userId, status])
   @@index([productId])
+}
+
+// ─────────────────────────────────────────────────────────
+// IMPACT TRACKING IA (V21) — Mide el ROI real de cada
+// recomendación IA aplicada: before/after snapshots + impact
+// estimado con heurísticas calibradas + impact realizado
+// cuando hay datos reales post-apply.
+// ─────────────────────────────────────────────────────────
+
+enum AppliedActionSource {
+  MEDIA_BUYER
+  STORE_OPTIMIZER
+  CREATIVE_MAKER
+}
+
+model AppliedAction {
+  id              String              @id @default(cuid())
+  userId          String
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  source          AppliedActionSource
+  actionType      String                                  // RecommendationType o OptimizationType
+  sourceRecId     String?                                 // id de la rec original (CampaignRecommendation/StoreOptimization)
+
+  // Contexto descriptivo
+  title           String
+  productId       String?
+  campaignId      String?
+
+  // Snapshots
+  beforeSnapshot  Json                                    // { roas, spend, revenue, salesLast30, marginPct, stockLevel, etc. }
+  afterSnapshot   Json?                                   // Se rellena en el recompute >=7d post-apply
+  afterSnapshotAt DateTime?
+
+  // Impacto estimado (calculado al aplicar, heurístico)
+  estimatedImpactUsd  Float?                              // +$ ganado o -$ ahorrado en COP
+  estimatedImpactKind String?                             // 'savings' | 'revenue' | 'margin' | 'retention'
+  estimatedRationale  String?                             // Explicación en español de cómo se calculó
+
+  // Impacto realizado (opcional — si hay datos reales post-apply)
+  realizedImpactUsd   Float?
+  realizedCalculatedAt DateTime?
+
+  appliedAt       DateTime            @default(now())
+  createdAt       DateTime            @default(now())
+
+  @@index([userId, appliedAt])
+  @@index([userId, source])
 }

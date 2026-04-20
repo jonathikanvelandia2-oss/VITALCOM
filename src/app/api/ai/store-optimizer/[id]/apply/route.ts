@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, apiError, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
+import { estimateStoreOptimizerImpact } from '@/lib/ai/impact-calculator'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,5 +74,37 @@ export const POST = withErrorHandler(async (_req: Request, ctx: any) => {
     data: { status: 'APPLIED', appliedAt: new Date() },
   })
 
-  return apiSuccess({ optimization: updated, sideEffect })
+  // V21 — Impact Tracking
+  const impact = estimateStoreOptimizerImpact({
+    type: rec.type,
+    salesLast30: rec.salesLast30,
+    revenueLast30: rec.revenueLast30,
+    marginPct: rec.marginPct,
+    stockLevel: rec.stockLevel,
+    suggestedValue: rec.suggestedValue,
+    productPrice: rec.product?.precioPublico,
+  })
+  await prisma.appliedAction.create({
+    data: {
+      userId: session.id,
+      source: 'STORE_OPTIMIZER',
+      actionType: rec.type,
+      sourceRecId: rec.id,
+      title: rec.title,
+      productId: rec.productId,
+      beforeSnapshot: {
+        salesLast30: rec.salesLast30,
+        revenueLast30: rec.revenueLast30,
+        marginPct: rec.marginPct,
+        stockLevel: rec.stockLevel,
+        conversionRate: rec.conversionRate,
+        suggestedValue: rec.suggestedValue,
+      },
+      estimatedImpactUsd: impact.amount,
+      estimatedImpactKind: impact.kind,
+      estimatedRationale: impact.rationale,
+    },
+  })
+
+  return apiSuccess({ optimization: updated, sideEffect, impact })
 })

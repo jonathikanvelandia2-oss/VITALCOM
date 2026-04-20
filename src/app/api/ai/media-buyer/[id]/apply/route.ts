@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, apiError, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
+import { estimateMediaBuyerImpact } from '@/lib/ai/impact-calculator'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,5 +48,35 @@ export const POST = withErrorHandler(async (_req: Request, ctx: any) => {
     data: { status: 'APPLIED', appliedAt: new Date() },
   })
 
-  return apiSuccess({ recommendation: updated, sideEffect })
+  // V21 — Impact Tracking: registrar AppliedAction con snapshot + estimate
+  const impact = estimateMediaBuyerImpact({
+    type: rec.type,
+    roas: rec.roas,
+    spend: rec.spend,
+    revenue: rec.revenue,
+    suggestedValue: rec.suggestedValue,
+  })
+  await prisma.appliedAction.create({
+    data: {
+      userId: session.id,
+      source: 'MEDIA_BUYER',
+      actionType: rec.type,
+      sourceRecId: rec.id,
+      title: rec.title,
+      campaignId: rec.campaignId,
+      beforeSnapshot: {
+        roas: rec.roas,
+        spend: rec.spend,
+        revenue: rec.revenue,
+        clicks: rec.clicks,
+        conversions: rec.conversions,
+        impressions: rec.impressions,
+      },
+      estimatedImpactUsd: impact.amount,
+      estimatedImpactKind: impact.kind,
+      estimatedRationale: impact.rationale,
+    },
+  })
+
+  return apiSuccess({ recommendation: updated, sideEffect, impact })
 })
