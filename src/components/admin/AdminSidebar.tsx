@@ -10,6 +10,7 @@ import {
   Bot, Gauge,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
+import { useInboxUnread } from '@/hooks/useInbox'
 
 // ── Sidebar Admin Vitalcom ───────────────────────────────
 // Vista CEO: acceso total a todas las áreas.
@@ -30,7 +31,7 @@ const NAV_SECTIONS: NavSection[] = [
     color: 'var(--vc-lime-main)',
     items: [
       { href: '/admin', label: 'Dashboard general', icon: LayoutDashboard },
-      { href: '/admin/inbox', label: 'Inbox interno', icon: Inbox, badge: '5' },
+      { href: '/admin/inbox', label: 'Inbox interno', icon: Inbox },
       { href: '/admin/cache-stats', label: 'Cache stats', icon: Gauge },
       { href: '/admin/ajustes', label: 'Ajustes', icon: Settings },
     ],
@@ -40,7 +41,7 @@ const NAV_SECTIONS: NavSection[] = [
     icon: ShoppingBag,
     color: '#a855f7',
     items: [
-      { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingBag, badge: '37' },
+      { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingBag },
       { href: '/admin/clientes', label: 'Clientes CRM', icon: Users },
       { href: '/admin/catalogo', label: 'Catálogo maestro', icon: Package },
     ],
@@ -86,6 +87,8 @@ const NAV_SECTIONS: NavSection[] = [
 
 export function AdminSidebar() {
   const pathname = usePathname()
+  const { data: unread } = useInboxUnread()
+  const inboxBadge = unread?.total && unread.total > 0 ? String(unread.total > 99 ? '99+' : unread.total) : undefined
 
   return (
     <aside
@@ -136,6 +139,7 @@ export function AdminSidebar() {
                 const Icon = item.icon
                 const active = pathname === item.href ||
                   (item.href !== '/admin' && pathname.startsWith(item.href))
+                const dynamicBadge = item.href === '/admin/inbox' ? inboxBadge : item.badge
                 return (
                   <Link
                     key={item.href}
@@ -152,10 +156,10 @@ export function AdminSidebar() {
                   >
                     <Icon size={15} />
                     <span className="flex-1">{item.label}</span>
-                    {item.badge && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[9px] font-bold"
+                    {dynamicBadge && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[9px] font-bold animate-pulse"
                         style={{ background: 'var(--vc-lime-main)', color: 'var(--vc-black)' }}>
-                        {item.badge}
+                        {dynamicBadge}
                       </span>
                     )}
                   </Link>

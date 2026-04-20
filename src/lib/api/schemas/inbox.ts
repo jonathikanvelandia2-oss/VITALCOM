@@ -18,6 +18,12 @@ export const createMessageSchema = z.object({
   receiverId: z.string().optional(),
 })
 
+export const updateThreadSchema = z.object({
+  resolved: z.boolean().optional(),
+  priority: z.enum(PRIORITIES).optional(),
+  area: z.enum(AREAS).optional(),
+}).refine((data) => Object.keys(data).length > 0, { message: 'Debes modificar al menos un campo' })
+
 export const threadFiltersSchema = z.object({
   area: z.string().optional(),
   resolved: z.string().optional(), // 'true' | 'false'
@@ -28,4 +34,5 @@ export const threadFiltersSchema = z.object({
 
 export type CreateThreadInput = z.infer<typeof createThreadSchema>
 export type CreateMessageInput = z.infer<typeof createMessageSchema>
+export type UpdateThreadInput = z.infer<typeof updateThreadSchema>
 export type ThreadFilters = z.infer<typeof threadFiltersSchema>

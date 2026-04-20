@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Inbox, Plus, Send, Loader2, X, Check } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { Inbox, Plus, Send, Loader2, X, Check, CheckCircle2, CircleDot, AlertTriangle, Flame } from 'lucide-react'
 import { AdminTopbar } from '@/components/admin/AdminTopbar'
-import { useThreads, useThreadMessages, useCreateThread, useSendMessage } from '@/hooks/useInbox'
+import { useThreads, useThreadMessages, useCreateThread, useSendMessage, useInboxUnread, useUpdateThread } from '@/hooks/useInbox'
 
 const PRIO_COLORS: Record<string, { bg: string; fg: string }> = {
   urgent: { bg: 'rgba(255, 71, 87, 0.18)', fg: 'var(--vc-error)' },
@@ -21,35 +22,76 @@ const AREA_FILTERS = ['', 'DIRECCION', 'MARKETING', 'COMERCIAL', 'ADMINISTRATIVA
 
 export default function InboxPage() {
   const [areaFilter, setAreaFilter] = useState('')
+  const [resolvedFilter, setResolvedFilter] = useState<'open' | 'all' | 'resolved'>('open')
   const [selectedThread, setSelectedThread] = useState<string | null>(null)
   const [showNewThread, setShowNewThread] = useState(false)
 
-  const { data, isLoading } = useThreads({ area: areaFilter || undefined, limit: 30 })
+  const { data, isLoading } = useThreads({
+    area: areaFilter || undefined,
+    limit: 30,
+    resolved: resolvedFilter === 'resolved' ? 'true' : resolvedFilter === 'open' ? 'false' : undefined,
+  })
+  const unread = useInboxUnread()
   const threads = data?.threads ?? []
   const total = data?.pagination?.total ?? 0
+  const byArea = unread.data?.byArea ?? {}
 
   return (
     <>
-      <AdminTopbar title="Inbox interno" subtitle={isLoading ? 'Cargando...' : `Comunicación entre áreas · ${total} hilos`} />
+      <AdminTopbar title="Inbox interno" subtitle={isLoading ? 'Cargando...' : `${total} hilos · ${unread.data?.total ?? 0} sin leer`} />
       <div className="flex flex-1 overflow-hidden" style={{ minHeight: 'calc(100vh - 130px)' }}>
         {/* Panel izquierdo: hilos */}
         <div className="flex w-full flex-col md:w-96 md:shrink-0" style={{ borderRight: '1px solid var(--vc-gray-dark)' }}>
           <div className="space-y-3 p-4">
-            {/* Filtros de área */}
+            {/* Filtros de área con badge de unread */}
             <div className="flex flex-wrap gap-1.5">
-              {AREA_FILTERS.map((a) => (
-                <button key={a} onClick={() => setAreaFilter(a)}
-                  className="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider"
+              {AREA_FILTERS.map((a) => {
+                const isActive = areaFilter === a
+                const count = a ? (byArea[a] ?? 0) : Object.values(byArea).reduce((s, n) => s + n, 0)
+                return (
+                  <button key={a} onClick={() => setAreaFilter(a)}
+                    className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider"
+                    style={{
+                      background: isActive ? 'var(--vc-lime-main)' : 'var(--vc-black-mid)',
+                      color: isActive ? 'var(--vc-black)' : 'var(--vc-white-dim)',
+                      border: isActive ? 'none' : '1px solid var(--vc-gray-dark)',
+                      fontFamily: 'var(--font-heading)',
+                    }}>
+                    {a ? (AREA_LABELS[a] ?? a) : 'Todas'}
+                    {count > 0 && (
+                      <span className="flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px]"
+                        style={{
+                          background: isActive ? 'var(--vc-black)' : 'var(--vc-lime-main)',
+                          color: isActive ? 'var(--vc-lime-main)' : 'var(--vc-black)',
+                        }}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Filtro estado */}
+            <div className="flex gap-1.5">
+              {([
+                { k: 'open', label: 'Abiertos', icon: CircleDot },
+                { k: 'all', label: 'Todos', icon: Inbox },
+                { k: 'resolved', label: 'Resueltos', icon: CheckCircle2 },
+              ] as const).map(({ k, label, icon: Icon }) => (
+                <button key={k} onClick={() => setResolvedFilter(k)}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-bold transition-colors"
                   style={{
-                    background: areaFilter === a ? 'var(--vc-lime-main)' : 'var(--vc-black-mid)',
-                    color: areaFilter === a ? 'var(--vc-black)' : 'var(--vc-white-dim)',
-                    border: areaFilter === a ? 'none' : '1px solid var(--vc-gray-dark)',
+                    background: resolvedFilter === k ? 'rgba(198,255,60,0.1)' : 'var(--vc-black-mid)',
+                    color: resolvedFilter === k ? 'var(--vc-lime-main)' : 'var(--vc-white-dim)',
+                    border: `1px solid ${resolvedFilter === k ? 'rgba(198,255,60,0.4)' : 'var(--vc-gray-dark)'}`,
                     fontFamily: 'var(--font-heading)',
                   }}>
-                  {a ? (AREA_LABELS[a] ?? a) : 'Todas'}
+                  <Icon size={11} /> {label}
                 </button>
               ))}
             </div>
+
             <button onClick={() => setShowNewThread(true)} className="vc-btn-primary flex w-full items-center justify-center gap-2">
               <Plus size={14} /> Nuevo hilo
             </button>
@@ -131,8 +173,11 @@ export default function InboxPage() {
 
 // ── Mensajes del hilo ──────────────────────────────────
 function ThreadMessages({ threadId }: { threadId: string }) {
+  const { data: session } = useSession()
+  const myId = (session?.user as any)?.id as string | undefined
   const { data, isLoading } = useThreadMessages(threadId)
   const sendMessage = useSendMessage(threadId)
+  const updateThread = useUpdateThread(threadId)
   const [body, setBody] = useState('')
 
   const thread = data?.thread
@@ -143,24 +188,86 @@ function ThreadMessages({ threadId }: { threadId: string }) {
     sendMessage.mutate({ body }, { onSuccess: () => setBody('') })
   }
 
+  function handleToggleResolved() {
+    if (!thread) return
+    updateThread.mutate({ resolved: !thread.resolved })
+  }
+
+  function handlePriority(priority: string) {
+    if (!thread || thread.priority === priority) return
+    updateThread.mutate({ priority: priority as any })
+  }
+
+  function handleReassign(area: string) {
+    if (!thread || thread.area === area) return
+    if (!confirm(`¿Reasignar este hilo a ${AREA_LABELS[area] ?? area}? Dejará de aparecer en tu bandeja.`)) return
+    updateThread.mutate({ area: area as any })
+  }
+
+  const isMessageSystem = (m: any) => m.body?.startsWith('— ')
+
   return (
     <div className="flex flex-1 flex-col">
-      {/* Header */}
+      {/* Header con acciones */}
       {thread && (
-        <div className="flex items-center gap-3 px-6 py-3" style={{ borderBottom: '1px solid var(--vc-gray-dark)', background: 'var(--vc-black-mid)' }}>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3"
+          style={{ borderBottom: '1px solid var(--vc-gray-dark)', background: 'var(--vc-black-mid)' }}>
           <div>
-            <h3 className="text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
-              {thread.subject}
-            </h3>
             <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold" style={{ color: 'var(--vc-white-soft)', fontFamily: 'var(--font-heading)' }}>
+                {thread.subject}
+              </h3>
+              {thread.resolved && (
+                <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold"
+                  style={{ background: 'rgba(198,255,60,0.15)', color: 'var(--vc-lime-main)', border: '1px solid rgba(198,255,60,0.4)' }}>
+                  <CheckCircle2 size={10} /> Resuelto
+                </span>
+              )}
+            </div>
+            <div className="mt-1 flex items-center gap-2">
               <span className="rounded px-1.5 py-0.5 text-[9px] font-bold"
                 style={{ background: 'var(--vc-black-soft)', color: 'var(--vc-lime-main)', border: '1px solid var(--vc-gray-dark)' }}>
                 {AREA_LABELS[thread.area] ?? thread.area}
               </span>
-              <span className="text-[10px]" style={{ color: (PRIO_COLORS[thread.priority] ?? PRIO_COLORS.normal).fg }}>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold"
+                style={{ color: (PRIO_COLORS[thread.priority] ?? PRIO_COLORS.normal).fg }}>
+                {thread.priority === 'urgent' && <Flame size={10} />}
+                {thread.priority === 'high' && <AlertTriangle size={10} />}
                 {thread.priority}
               </span>
             </div>
+          </div>
+
+          {/* Acciones */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <select value={thread.priority} onChange={(e) => handlePriority(e.target.value)}
+              disabled={updateThread.isPending}
+              className="rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none"
+              style={{ background: 'var(--vc-black-soft)', color: 'var(--vc-white-soft)', border: '1px solid var(--vc-gray-dark)', fontFamily: 'var(--font-heading)' }}>
+              <option value="low">Baja</option>
+              <option value="normal">Normal</option>
+              <option value="high">Alta</option>
+              <option value="urgent">Urgente</option>
+            </select>
+            <select value={thread.area} onChange={(e) => handleReassign(e.target.value)}
+              disabled={updateThread.isPending}
+              className="rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none"
+              style={{ background: 'var(--vc-black-soft)', color: 'var(--vc-white-soft)', border: '1px solid var(--vc-gray-dark)', fontFamily: 'var(--font-heading)' }}>
+              {Object.entries(AREA_LABELS).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+            <button onClick={handleToggleResolved} disabled={updateThread.isPending}
+              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition-colors"
+              style={{
+                background: thread.resolved ? 'rgba(255,184,0,0.12)' : 'rgba(198,255,60,0.12)',
+                color: thread.resolved ? 'var(--vc-warning)' : 'var(--vc-lime-main)',
+                border: `1px solid ${thread.resolved ? 'rgba(255,184,0,0.4)' : 'rgba(198,255,60,0.4)'}`,
+                fontFamily: 'var(--font-heading)',
+              }}>
+              {updateThread.isPending ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+              {thread.resolved ? 'Reabrir' : 'Resolver'}
+            </button>
           </div>
         </div>
       )}
@@ -175,14 +282,37 @@ function ThreadMessages({ threadId }: { threadId: string }) {
           <p className="py-8 text-center text-xs" style={{ color: 'var(--vc-gray-mid)' }}>Sin mensajes aún</p>
         ) : (
           messages.map((m: any) => {
+            // Auditoría (cambio de estado) con estilo diferente
+            if (isMessageSystem(m)) {
+              return (
+                <div key={m.id} className="flex items-center gap-2 py-1 text-[10px]"
+                  style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>
+                  <div className="h-px flex-1" style={{ background: 'var(--vc-gray-dark)' }} />
+                  <span>{m.body.replace(/^—\s?/, '')}</span>
+                  <span>·</span>
+                  <span>{new Date(m.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <div className="h-px flex-1" style={{ background: 'var(--vc-gray-dark)' }} />
+                </div>
+              )
+            }
+
+            const isMine = m.sender?.id === myId
             const initials = (m.sender?.name ?? '??').split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+
             return (
-              <div key={m.id} className="flex gap-3">
+              <div key={m.id} className={`flex gap-3 ${isMine ? 'flex-row-reverse' : ''}`}>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
-                  style={{ background: 'var(--vc-gradient-primary)', color: 'var(--vc-black)', fontFamily: 'var(--font-heading)' }}>
+                  style={{
+                    background: isMine ? 'var(--vc-info)' : 'var(--vc-gradient-primary)',
+                    color: 'var(--vc-black)', fontFamily: 'var(--font-heading)',
+                  }}>
                   {initials}
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className={`max-w-[70%] rounded-xl px-3 py-2 ${isMine ? 'items-end' : ''}`}
+                  style={{
+                    background: isMine ? 'rgba(60,198,255,0.1)' : 'var(--vc-black-mid)',
+                    border: `1px solid ${isMine ? 'rgba(60,198,255,0.3)' : 'var(--vc-gray-dark)'}`,
+                  }}>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold" style={{ color: 'var(--vc-white-soft)' }}>{m.sender?.name}</span>
                     <span className="text-[9px]" style={{ color: 'var(--vc-gray-mid)', fontFamily: 'var(--font-mono)' }}>

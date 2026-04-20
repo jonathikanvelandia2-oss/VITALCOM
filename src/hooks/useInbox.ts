@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { CreateThreadInput, CreateMessageInput, ThreadFilters } from '@/lib/api/schemas/inbox'
+import type { CreateThreadInput, CreateMessageInput, ThreadFilters, UpdateThreadInput } from '@/lib/api/schemas/inbox'
 
 // ── Hooks de inbox interno — React Query ────────────────
 
@@ -23,7 +23,7 @@ async function mutator(url: string, method: string, body?: unknown) {
   return json.data
 }
 
-/** Lista de hilos con filtros */
+/** Lista de hilos con filtros — refetch automático cada 15s */
 export function useThreads(filters: Partial<ThreadFilters> = {}) {
   const params = new URLSearchParams()
   Object.entries(filters).forEach(([k, v]) => {
@@ -33,16 +33,26 @@ export function useThreads(filters: Partial<ThreadFilters> = {}) {
   return useQuery({
     queryKey: ['threads', filters],
     queryFn: () => fetcher(`/api/inbox/threads?${params}`),
+    refetchInterval: 15000,
   })
 }
 
-/** Mensajes de un hilo */
+/** Mensajes de un hilo — refetch cada 5s mientras está abierto */
 export function useThreadMessages(threadId: string | null) {
   return useQuery({
     queryKey: ['threadMessages', threadId],
     queryFn: () => fetcher(`/api/inbox/threads/${threadId}/messages`),
     enabled: !!threadId,
-    refetchInterval: 10000, // Polling cada 10s para simular tiempo real
+    refetchInterval: 5000,
+  })
+}
+
+/** Contador global de mensajes no leídos + por área — 15s polling */
+export function useInboxUnread() {
+  return useQuery<{ total: number; byArea: Record<string, number> }>({
+    queryKey: ['inboxUnread'],
+    queryFn: () => fetcher('/api/inbox/unread'),
+    refetchInterval: 15000,
   })
 }
 
@@ -64,6 +74,21 @@ export function useSendMessage(threadId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['threadMessages', threadId] })
       qc.invalidateQueries({ queryKey: ['threads'] })
+      qc.invalidateQueries({ queryKey: ['inboxUnread'] })
+    },
+  })
+}
+
+/** Actualizar hilo (resolver/reasignar/priorizar) — solo staff */
+export function useUpdateThread(threadId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: UpdateThreadInput) =>
+      mutator(`/api/inbox/threads/${threadId}`, 'PATCH', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['threads'] })
+      qc.invalidateQueries({ queryKey: ['threadMessages', threadId] })
+      qc.invalidateQueries({ queryKey: ['inboxUnread'] })
     },
   })
 }
