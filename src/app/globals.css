@@ -322,3 +322,30 @@ body {
   border: 1px solid rgba(198, 255, 60, 0.4);
   box-shadow: 0 0 30px var(--vc-glow-lime);
 }
+
+/* ─── Skeleton shimmer (V2 Fundación) ──────────────── */
+.vc-skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(198, 255, 60, 0.06) 45%,
+    rgba(198, 255, 60, 0.12) 50%,
+    rgba(198, 255, 60, 0.06) 55%,
+    transparent 100%
+  );
+  animation: vc-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes vc-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vc-skeleton-shimmer::after {
+    animation: none;
+  }
+}
