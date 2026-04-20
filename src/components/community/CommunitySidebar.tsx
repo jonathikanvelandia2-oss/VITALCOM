@@ -27,6 +27,7 @@ import {
   Target,
   Rocket,
   Sparkles,
+  Brain,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 
@@ -43,7 +44,8 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/pedidos', label: 'Mis Pedidos', icon: ShoppingCart },
       { href: '/mi-pyg', label: 'Mi P&G', icon: Wallet },
       { href: '/publicidad', label: 'Publicidad', icon: Rocket },
-      { href: '/lanzador', label: 'Lanzador Ads', icon: Sparkles, badge: 'NEW' },
+      { href: '/lanzador', label: 'Lanzador Ads', icon: Sparkles },
+      { href: '/mediabuyer', label: 'MediaBuyer IA', icon: Brain, badge: 'NEW' },
       { href: '/mi-blueprint', label: 'Mi Blueprint', icon: Target, badge: 'IA' },
       { href: '/rendimiento', label: 'Rendimiento', icon: TrendingUp },
       { href: '/herramientas/catalogo', label: 'Catálogo Vitalcom', icon: Package },

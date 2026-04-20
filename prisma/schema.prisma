@@ -135,6 +135,7 @@ model User {
   workflowActivations UserWorkflowActivation[]
   adAccounts       AdAccount[]
   campaignDrafts   CampaignDraft[]
+  campaignRecommendations CampaignRecommendation[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -591,8 +592,9 @@ model AdAccount {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  campaigns    AdCampaign[]
-  spendEntries AdSpendEntry[]
+  campaigns       AdCampaign[]
+  spendEntries    AdSpendEntry[]
+  recommendations CampaignRecommendation[]
 
   @@unique([userId, platform, accountId])
   @@index([userId])
@@ -611,7 +613,8 @@ model AdCampaign {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  spendEntries AdSpendEntry[]
+  spendEntries    AdSpendEntry[]
+  recommendations CampaignRecommendation[]
 
   @@index([accountId])
 }
@@ -800,4 +803,67 @@ model CampaignDraft {
   updatedAt     DateTime   @updatedAt
 
   @@index([userId, status])
+}
+
+// ─────────────────────────────────────────────────────────
+// MEDIA BUYER IA (V16) — Recomendaciones accionables
+// ─────────────────────────────────────────────────────────
+// Analiza campañas activas y genera recomendaciones concretas
+// (pausar/escalar/testear) con reasoning IA + métricas reales.
+
+enum RecommendationType {
+  PAUSE_CAMPAIGN        // ROAS bajo sostenido
+  SCALE_BUDGET          // ROAS alto consistente
+  REDUCE_BUDGET         // ROAS marginal, reduce en vez de pausar
+  TEST_CREATIVE         // CTR bajo, fatiga de creativo
+  TEST_AUDIENCE         // Frecuencia alta, audiencia saturada
+  OPTIMIZE_BID          // CPC alto vs benchmark
+  RESTART_CAMPAIGN      // Campaña pausada con potencial
+  ADD_TRACKING          // Falta datos para decidir
+}
+
+enum RecommendationStatus {
+  PENDING
+  APPLIED
+  DISMISSED
+  EXPIRED
+}
+
+model CampaignRecommendation {
+  id            String              @id @default(cuid())
+  userId        String
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId    String?
+  campaign      AdCampaign?         @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  accountId     String?
+  account       AdAccount?          @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  type          RecommendationType
+  status        RecommendationStatus @default(PENDING)
+  priority      Int                 @default(50)        // 0 (baja) - 100 (crítica)
+
+  title         String                                  // "Pausa 'Colágeno CO — Mujeres 25-45'"
+  reasoning     String                                  // Por qué IA lo recomienda
+  actionLabel   String                                  // "Pausar ahora" / "Subir +30%"
+  suggestedValue Float?                                 // % o COP sugerido
+
+  // Snapshot de métricas al generar
+  roas          Float?
+  spend         Float?
+  revenue       Float?
+  clicks        Int?
+  conversions   Int?
+  impressions   Int?
+  confidence    Float?              @default(0.5)       // 0-1 certeza del modelo
+
+  // Resultado
+  appliedAt     DateTime?
+  dismissedAt   DateTime?
+  expiresAt     DateTime                                // Recomendaciones caducan en 72h
+
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([userId, status])
+  @@index([campaignId])
 }
