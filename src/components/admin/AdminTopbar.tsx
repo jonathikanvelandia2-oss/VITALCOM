@@ -1,6 +1,7 @@
 'use client'
 
-import { Bell, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
+import { NotificationBell } from '@/components/shared/NotificationBell'
 
 // Topbar fija del panel admin con buscador global y notificaciones
 type Props = {
@@ -57,23 +58,7 @@ export function AdminTopbar({ title, subtitle }: Props) {
             style={{ color: 'var(--vc-white-soft)' }}
           />
         </div>
-        <button
-          className="relative flex h-10 w-10 items-center justify-center rounded-lg"
-          style={{
-            background: 'var(--vc-black-soft)',
-            border: '1px solid var(--vc-gray-dark)',
-            color: 'var(--vc-white-dim)',
-          }}
-        >
-          <Bell size={16} />
-          <span
-            className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full"
-            style={{
-              background: 'var(--vc-lime-main)',
-              boxShadow: '0 0 8px var(--vc-glow-strong)',
-            }}
-          />
-        </button>
+        <NotificationBell />
       </div>
     </header>
   )

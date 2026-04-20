@@ -7,6 +7,8 @@ import {
 } from '@/lib/integrations/dropi'
 import { FinanceRepository } from '@/lib/repositories/finance-repository'
 import { VALID_TRANSITIONS } from '@/lib/api/schemas/order'
+import { createNotification } from '@/lib/notifications/service'
+import { sendOrderStatusUpdateEmail } from '@/lib/email'
 
 // ── POST /api/dropi/webhooks/tracking ──────────────────
 // Dropi notifica cambios de estado de envíos. Payload típico:
@@ -131,6 +133,37 @@ export async function POST(req: Request) {
       err: err instanceof Error ? err.message : err,
     })
     // No fallamos el webhook — el estado ya quedó guardado.
+  }
+
+  // Notificación in-app + email al dueño del pedido (fire-and-forget)
+  if (order.userId && ['DISPATCHED', 'DELIVERED', 'CANCELLED', 'RETURNED'].includes(newStatus)) {
+    const title = {
+      DISPATCHED: `Pedido ${order.number} despachado`,
+      DELIVERED: `Pedido ${order.number} entregado`,
+      CANCELLED: `Pedido ${order.number} cancelado`,
+      RETURNED: `Pedido ${order.number} devuelto`,
+    }[newStatus as 'DISPATCHED' | 'DELIVERED' | 'CANCELLED' | 'RETURNED']
+
+    createNotification({
+      userId: order.userId,
+      type: 'ORDER_STATUS',
+      title,
+      body: trackingCode ? `Guía: ${trackingCode}` : undefined,
+      link: '/pedidos',
+      meta: { orderId: order.id, orderNumber: order.number, status: newStatus, source: 'dropi' },
+    }).catch(() => {})
+  }
+
+  if (order.customerEmail && ['DISPATCHED', 'DELIVERED', 'CANCELLED', 'RETURNED'].includes(newStatus)) {
+    sendOrderStatusUpdateEmail(order.customerEmail, {
+      orderNumber: order.number,
+      customerName: order.customerName,
+      status: newStatus as 'DISPATCHED' | 'DELIVERED' | 'CANCELLED' | 'RETURNED',
+      trackingCode: trackingCode ?? order.trackingCode,
+      carrier: payload.carrier ?? order.carrier,
+      total: order.total,
+      country: order.country,
+    }).catch(() => {})
   }
 
   return NextResponse.json({ received: true, from: order.status, to: newStatus })

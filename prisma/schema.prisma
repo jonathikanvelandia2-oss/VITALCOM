@@ -128,6 +128,7 @@ model User {
   meetings         Meeting[]
   uploadedDocs     Document[]          @relation("UploadedDocs")
   financeEntries   FinanceEntry[]
+  notifications    Notification[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -519,6 +520,41 @@ model FinanceEntry {
   @@index([userId, date])
   @@index([userId, type, category])
   @@index([relatedOrderId])
+}
+
+// ─────────────────────────────────────────────────────────
+// NOTIFICACIONES (in-app bell)
+// ─────────────────────────────────────────────────────────
+// Centraliza avisos al usuario: cambios de estado de pedido,
+// menciones en comunidad, hilos de inbox asignados, etc.
+// Para emails transaccionales, el envío se hace además desde
+// el disparador del evento — este modelo es solo para el bell.
+
+enum NotificationType {
+  ORDER_STATUS      // Pedido cambió de estado (DISPATCHED / DELIVERED / etc.)
+  ORDER_NEW         // Nuevo pedido recibido (staff)
+  INBOX_MESSAGE     // Mensaje nuevo en hilo del inbox
+  INBOX_ASSIGNED    // Hilo reasignado a tu área
+  COMMUNITY_LIKE    // Like a tu post/comentario
+  COMMUNITY_REPLY   // Respuesta a tu comentario
+  STORE_CONNECTED   // Tienda Shopify conectada
+  SYSTEM            // Anuncios de plataforma
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?          // Ruta interna para redirigir al hacer click
+  meta      Json?            // Payload adicional (orderNumber, threadId, etc.)
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read, createdAt])
+  @@index([userId, createdAt])
 }
 
 // ─────────────────────────────────────────────────────────

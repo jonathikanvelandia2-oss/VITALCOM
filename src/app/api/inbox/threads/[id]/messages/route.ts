@@ -1,7 +1,8 @@
 import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, withErrorHandler } from '@/lib/api/response'
-import { requireSession } from '@/lib/auth/session'
+import { requireSession, isStaff } from '@/lib/auth/session'
 import { createMessageSchema } from '@/lib/api/schemas/inbox'
+import { createBulkNotifications, getStaffIdsForArea } from '@/lib/notifications/service'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -67,6 +68,36 @@ export const POST = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     where: { id: threadId },
     data: { updatedAt: new Date() },
   })
+
+  // Notificar a destinatarios (no al sender):
+  // - Si sender es staff → notificar a otros participantes no-staff del hilo
+  // - Si sender es comunidad → notificar a staff responsable del área
+  const senderIsStaff = isStaff(session.role)
+  const recipients = new Set<string>()
+
+  if (senderIsStaff) {
+    const participants = await prisma.inboxMessage.findMany({
+      where: { threadId, senderId: { not: session.id } },
+      select: { senderId: true },
+      distinct: ['senderId'],
+    })
+    for (const p of participants) recipients.add(p.senderId)
+  } else {
+    const staffIds = await getStaffIdsForArea(thread.area)
+    for (const id of staffIds) if (id !== session.id) recipients.add(id)
+  }
+
+  if (recipients.size > 0) {
+    const preview = data.body.length > 80 ? data.body.slice(0, 80) + '…' : data.body
+    const senderName = session.name ?? session.email.split('@')[0]
+    createBulkNotifications(Array.from(recipients), {
+      type: 'INBOX_MESSAGE',
+      title: `${senderName} · ${thread.subject}`,
+      body: preview,
+      link: `/admin/inbox?thread=${threadId}`,
+      meta: { threadId, area: thread.area },
+    }).catch(() => {})
+  }
 
   return apiSuccess(message, 201)
 })

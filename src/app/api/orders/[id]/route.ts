@@ -4,6 +4,8 @@ import { updateOrderStatusSchema, VALID_TRANSITIONS } from '@/lib/api/schemas/or
 import { OrderRepository } from '@/lib/repositories/order-repository'
 import { FinanceRepository } from '@/lib/repositories/finance-repository'
 import { prisma } from '@/lib/db/prisma'
+import { createNotification } from '@/lib/notifications/service'
+import { sendOrderStatusUpdateEmail } from '@/lib/email'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -83,6 +85,38 @@ export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     await FinanceRepository.recordOrderCancellation(id)
   } else if (data.status === 'RETURNED') {
     await FinanceRepository.recordOrderReturn(id)
+  }
+
+  // Notificar al dueño del pedido (bell + email) — solo estados finales/visibles
+  const notifiableStatus = ['DISPATCHED', 'DELIVERED', 'CANCELLED', 'RETURNED'] as const
+  if (order.userId && (notifiableStatus as readonly string[]).includes(data.status)) {
+    const title = {
+      DISPATCHED: `Pedido ${updated.number} despachado`,
+      DELIVERED: `Pedido ${updated.number} entregado`,
+      CANCELLED: `Pedido ${updated.number} cancelado`,
+      RETURNED: `Pedido ${updated.number} devuelto`,
+    }[data.status as 'DISPATCHED' | 'DELIVERED' | 'CANCELLED' | 'RETURNED']
+
+    createNotification({
+      userId: order.userId,
+      type: 'ORDER_STATUS',
+      title,
+      body: updated.trackingCode ? `Guía: ${updated.trackingCode}` : undefined,
+      link: `/pedidos`,
+      meta: { orderId: id, orderNumber: updated.number, status: data.status },
+    }).catch(() => {})
+
+    if (order.customerEmail) {
+      sendOrderStatusUpdateEmail(order.customerEmail, {
+        orderNumber: updated.number,
+        customerName: updated.customerName,
+        status: data.status as 'DISPATCHED' | 'DELIVERED' | 'CANCELLED' | 'RETURNED',
+        trackingCode: updated.trackingCode,
+        carrier: updated.carrier,
+        total: updated.total,
+        country: updated.country,
+      }).catch(() => {})
+    }
   }
 
   OrderRepository.invalidateOne(id, order.userId)

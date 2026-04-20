@@ -3,6 +3,7 @@ import { renderWelcome, type WelcomeInput } from './templates/welcome'
 import { renderPasswordReset, type PasswordResetInput } from './templates/password-reset'
 import { renderOrderConfirmation, type OrderConfirmationInput } from './templates/order-confirmation'
 import { renderEmailVerification, type EmailVerificationInput } from './templates/email-verification'
+import { renderOrderStatusUpdate, type OrderStatusUpdateInput } from './templates/order-status-update'
 
 // ── API de alto nivel — una función por tipo de email ──
 // Cada helper acepta el "to" + los datos del template y llama
@@ -52,6 +53,21 @@ export async function sendEmailVerification(to: string, data: EmailVerificationI
     html,
     text,
     tags: [{ name: 'type', value: 'email_verification' }],
+  })
+}
+
+export async function sendOrderStatusUpdateEmail(to: string, data: OrderStatusUpdateInput): Promise<SendEmailResult> {
+  const { subject, html, text } = renderOrderStatusUpdate(data)
+  return sendEmail({
+    to,
+    subject,
+    html,
+    text,
+    tags: [
+      { name: 'type', value: 'order_status' },
+      { name: 'status', value: data.status.toLowerCase() },
+      { name: 'order', value: data.orderNumber.replace(/[^a-z0-9_-]/gi, '_') },
+    ],
   })
 }
 
