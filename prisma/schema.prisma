@@ -134,6 +134,7 @@ model User {
   directMessages   DirectMessage[]     @relation("DirectMessageSender")
   workflowActivations UserWorkflowActivation[]
   adAccounts       AdAccount[]
+  campaignDrafts   CampaignDraft[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -186,6 +187,7 @@ model Product {
   stock            Stock[]
   orderItems       OrderItem[]
   shopifySync      ProductSync[]
+  campaignDrafts   CampaignDraft[]
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 }
@@ -727,4 +729,75 @@ model Event {
   published   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────
+// WIZARD LANZADOR DE CAMPAÑAS (V15 / V3 plan)
+// ─────────────────────────────────────────────────────────
+// CampaignDraft guarda el estado del wizard de 5 pasos.
+// Queda en DRAFT/READY hasta que OAuth esté vivo; al lanzar
+// se crea un AdCampaign real y el externalId llega del API.
+
+enum DraftStatus {
+  DRAFT       // Borrador — wizard en curso
+  READY       // Completo, esperando OAuth o botón "Publicar"
+  LAUNCHED    // Publicado en plataforma
+  PAUSED
+  ARCHIVED
+}
+
+enum CampaignObjective {
+  CONVERSIONS
+  TRAFFIC
+  REACH
+  LEADS
+  ENGAGEMENT
+  MESSAGES
+}
+
+model CampaignDraft {
+  id            String     @id @default(cuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId     String?
+  product       Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  name          String
+  platform      AdPlatform        @default(META)
+  objective     CampaignObjective @default(CONVERSIONS)
+  status        DraftStatus       @default(DRAFT)
+  step          Int               @default(1) // Paso actual del wizard (1-5)
+
+  // Paso 2 — Audiencia
+  targetCountry Country?
+  ageMin        Int?              @default(18)
+  ageMax        Int?              @default(55)
+  gender        String?           @default("ALL") // ALL, MALE, FEMALE
+  interests     String[]
+  placements    String[]
+
+  // Paso 3 — Creativo
+  headline      String?
+  primaryText   String?
+  description   String?
+  cta           String?           @default("BUY_NOW")
+  imageUrl      String?
+  videoUrl      String?
+  landingUrl    String?
+
+  // Paso 4 — Presupuesto
+  dailyBudget   Float?
+  totalBudget   Float?
+  durationDays  Int?              @default(7)
+  startDate     DateTime?
+
+  // Resultado de lanzamiento
+  launchedCampaignId String?      // -> AdCampaign.id cuando se publique
+  externalId         String?      // ID en la plataforma tras OAuth launch
+  launchNotes        String?      // Errores de launch, warnings
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@index([userId, status])
 }

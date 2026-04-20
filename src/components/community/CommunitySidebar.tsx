@@ -26,6 +26,7 @@ import {
   ShoppingCart,
   Target,
   Rocket,
+  Sparkles,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 
@@ -41,7 +42,8 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/mi-tienda', label: 'Mi Tienda', icon: ShoppingBag, badge: '3' },
       { href: '/pedidos', label: 'Mis Pedidos', icon: ShoppingCart },
       { href: '/mi-pyg', label: 'Mi P&G', icon: Wallet },
-      { href: '/publicidad', label: 'Publicidad', icon: Rocket, badge: 'NEW' },
+      { href: '/publicidad', label: 'Publicidad', icon: Rocket },
+      { href: '/lanzador', label: 'Lanzador Ads', icon: Sparkles, badge: 'NEW' },
       { href: '/mi-blueprint', label: 'Mi Blueprint', icon: Target, badge: 'IA' },
       { href: '/rendimiento', label: 'Rendimiento', icon: TrendingUp },
       { href: '/herramientas/catalogo', label: 'Catálogo Vitalcom', icon: Package },
