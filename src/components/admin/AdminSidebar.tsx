@@ -7,7 +7,7 @@ import {
   Inbox, DollarSign, Settings, LogOut, Megaphone, Truck,
   FileText, Calculator, Crown, BarChart3, Target, Zap,
   MessageSquare, Receipt, UserCheck, FolderOpen, Building2,
-  Bot, Gauge,
+  Bot, Gauge, Brain,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 import { useInboxUnread } from '@/hooks/useInbox'
@@ -31,6 +31,7 @@ const NAV_SECTIONS: NavSection[] = [
     color: 'var(--vc-lime-main)',
     items: [
       { href: '/admin', label: 'Dashboard general', icon: LayoutDashboard },
+      { href: '/admin/asistente', label: 'Asesor CEO (IA)', icon: Brain, badge: 'IA' },
       { href: '/admin/inbox', label: 'Inbox interno', icon: Inbox },
       { href: '/admin/cache-stats', label: 'Cache stats', icon: Gauge },
       { href: '/admin/ajustes', label: 'Ajustes', icon: Settings },
