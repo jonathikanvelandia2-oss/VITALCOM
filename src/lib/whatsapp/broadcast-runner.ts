@@ -1,0 +1,256 @@
+// V29 — Broadcast runner
+// ═══════════════════════════════════════════════════════════
+// Ejecuta un broadcast: resuelve segmentación, crea recipients
+// (asignando variante A/B si corresponde), envía plantillas en
+// tandas con delay para respetar rate limit Meta, actualiza stats.
+//
+// Respeta:
+// - opt-out (contact.isOptedIn=false → skip)
+// - cuenta activa
+// - rate limit (pausa 200ms entre envíos por cuenta)
+//
+// Modo MOCK: los envíos loguean + crean WhatsappMessage vía sendTemplate.
+
+import { prisma } from '@/lib/db/prisma'
+import { sendTemplate } from './client'
+import { pickWeightedVariant } from './ab-testing'
+import {
+  WaBroadcastStatus,
+  WaBroadcastRecipientStatus,
+} from '@prisma/client'
+
+interface SegmentFilter {
+  segment?: string
+  tags?: string[]
+  country?: string
+  minLtv?: number
+  excludeTags?: string[]
+  onlyOptedIn?: boolean      // default true
+}
+
+// Resuelve los contactos que matchean el filtro
+export async function resolveRecipients(
+  accountId: string,
+  filter: SegmentFilter,
+): Promise<Array<{ id: string; phoneE164: string; firstName: string | null; tags: unknown }>> {
+  const contacts = await prisma.whatsappContact.findMany({
+    where: {
+      accountId,
+      ...(filter.onlyOptedIn !== false ? { isOptedIn: true } : {}),
+      ...(filter.segment ? { segment: filter.segment } : {}),
+      ...(filter.country ? { shippingCountry: filter.country } : {}),
+      ...(filter.minLtv != null ? { lifetimeValue: { gte: filter.minLtv } } : {}),
+    },
+    select: { id: true, phoneE164: true, firstName: true, tags: true },
+    take: 5000, // guardia razonable
+  })
+
+  // Filtro de tags en memoria (porque son JSON)
+  const includeTags = filter.tags ?? []
+  const excludeTags = filter.excludeTags ?? []
+
+  return contacts.filter(c => {
+    const tagList = Array.isArray(c.tags) ? c.tags as Array<{ key?: string }> : []
+    const keys = tagList.map(t => t?.key).filter(Boolean) as string[]
+    if (includeTags.length > 0 && !includeTags.some(t => keys.includes(t))) return false
+    if (excludeTags.length > 0 && excludeTags.some(t => keys.includes(t))) return false
+    return true
+  })
+}
+
+// Crea recipients + asigna variante A/B
+export async function prepareBroadcast(broadcastId: string): Promise<{
+  totalRecipients: number
+  skippedOptedOut: number
+}> {
+  const broadcast = await prisma.whatsappBroadcast.findUniqueOrThrow({
+    where: { id: broadcastId },
+  })
+
+  const filter = (broadcast.segmentFilter ?? {}) as SegmentFilter
+  const candidates = await resolveRecipients(broadcast.accountId, filter)
+
+  // Si hay variantGroup, cargar variantes
+  let variants: Array<{ id: string; metaName: string; weight: number; variantKey: string }> = []
+  if (broadcast.variantGroup) {
+    const tmpls = await prisma.whatsappTemplate.findMany({
+      where: { accountId: broadcast.accountId, variantGroup: broadcast.variantGroup },
+      orderBy: { metaName: 'asc' },
+    })
+    variants = tmpls.map((t, idx) => ({
+      id: t.id,
+      metaName: t.metaName,
+      weight: t.weight,
+      variantKey: String.fromCharCode(65 + idx),
+    }))
+  }
+
+  // Crear recipients en batches para rendimiento
+  const BATCH = 500
+  let created = 0
+  for (let i = 0; i < candidates.length; i += BATCH) {
+    const batch = candidates.slice(i, i + BATCH)
+    await prisma.whatsappBroadcastRecipient.createMany({
+      data: batch.map(c => {
+        const chosen = variants.length > 0 ? pickWeightedVariant(variants) : null
+        return {
+          broadcastId,
+          contactId: c.id,
+          phoneE164: c.phoneE164,
+          templateId: chosen?.id,
+          variantKey: chosen?.variantKey,
+          status: WaBroadcastRecipientStatus.PENDING,
+        }
+      }),
+      skipDuplicates: true,
+    })
+    created += batch.length
+  }
+
+  await prisma.whatsappBroadcast.update({
+    where: { id: broadcastId },
+    data: { totalRecipients: created },
+  })
+
+  return { totalRecipients: created, skippedOptedOut: 0 }
+}
+
+// Ejecuta el envío — tandas, rate limit, updates
+export async function executeBroadcast(broadcastId: string): Promise<{
+  sent: number
+  failed: number
+}> {
+  const broadcast = await prisma.whatsappBroadcast.findUniqueOrThrow({
+    where: { id: broadcastId },
+    include: { account: true },
+  })
+
+  if (broadcast.status === WaBroadcastStatus.COMPLETED) {
+    return { sent: broadcast.sentCount, failed: broadcast.failedCount }
+  }
+
+  await prisma.whatsappBroadcast.update({
+    where: { id: broadcastId },
+    data: { status: WaBroadcastStatus.RUNNING, startedAt: new Date() },
+  })
+
+  let sent = 0
+  let failed = 0
+  const BATCH = 50
+  let offset = 0
+
+  while (true) {
+    const pending = await prisma.whatsappBroadcastRecipient.findMany({
+      where: { broadcastId, status: WaBroadcastRecipientStatus.PENDING },
+      include: { template: true },
+      take: BATCH,
+    })
+    if (pending.length === 0) break
+
+    for (const r of pending) {
+      try {
+        const templateName = r.template?.metaName ?? broadcast.templateName
+        const res = await sendTemplate({
+          accountId: broadcast.accountId,
+          toPhoneE164: r.phoneE164,
+          templateName,
+          languageCode: broadcast.languageCode,
+          headerVariables: broadcast.headerVariables as never,
+          bodyVariables: broadcast.bodyVariables as never,
+          // No conversationId: es un broadcast, no una conversación activa
+        })
+
+        await prisma.whatsappBroadcastRecipient.update({
+          where: { id: r.id },
+          data: {
+            status: WaBroadcastRecipientStatus.SENT,
+            metaMessageId: res.metaMessageId,
+            sentAt: new Date(),
+          },
+        })
+        sent++
+        // Rate limit suave: 200ms entre envíos
+        await new Promise(resolve => setTimeout(resolve, 200))
+      } catch (err) {
+        const reason = (err as Error).message.slice(0, 500)
+        await prisma.whatsappBroadcastRecipient.update({
+          where: { id: r.id },
+          data: {
+            status: WaBroadcastRecipientStatus.FAILED,
+            failureReason: reason,
+          },
+        })
+        failed++
+      }
+    }
+
+    // Actualizar contadores agregados
+    await prisma.whatsappBroadcast.update({
+      where: { id: broadcastId },
+      data: {
+        sentCount: { increment: pending.filter(r => true).length - failed },
+        failedCount: failed,
+      },
+    }).catch(() => {})
+
+    offset += pending.length
+    // Guardia — no procesar más de 5k en una sola invocación
+    if (offset >= 5000) break
+  }
+
+  // Verificar si quedan pendientes
+  const stillPending = await prisma.whatsappBroadcastRecipient.count({
+    where: { broadcastId, status: WaBroadcastRecipientStatus.PENDING },
+  })
+
+  await prisma.whatsappBroadcast.update({
+    where: { id: broadcastId },
+    data: {
+      sentCount: sent,
+      failedCount: failed,
+      ...(stillPending === 0 && {
+        status: WaBroadcastStatus.COMPLETED,
+        completedAt: new Date(),
+      }),
+    },
+  })
+
+  return { sent, failed }
+}
+
+// Estadísticas agregadas por variante (para dashboard A/B)
+export async function getBroadcastStats(broadcastId: string) {
+  const broadcast = await prisma.whatsappBroadcast.findUniqueOrThrow({
+    where: { id: broadcastId },
+  })
+
+  const byStatus = await prisma.whatsappBroadcastRecipient.groupBy({
+    by: ['status'],
+    where: { broadcastId },
+    _count: { _all: true },
+  })
+
+  const byVariant = await prisma.whatsappBroadcastRecipient.groupBy({
+    by: ['variantKey', 'status'],
+    where: { broadcastId, variantKey: { not: null } },
+    _count: { _all: true },
+  })
+
+  const statusCounts = byStatus.reduce((acc, r) => {
+    acc[r.status] = r._count._all
+    return acc
+  }, {} as Record<string, number>)
+
+  const variantMap = new Map<string, Record<string, number>>()
+  for (const r of byVariant) {
+    if (!r.variantKey) continue
+    if (!variantMap.has(r.variantKey)) variantMap.set(r.variantKey, {})
+    variantMap.get(r.variantKey)![r.status] = r._count._all
+  }
+
+  return {
+    broadcast,
+    statusCounts,
+    variants: [...variantMap.entries()].map(([key, counts]) => ({ key, counts })),
+  }
+}

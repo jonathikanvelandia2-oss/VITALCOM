@@ -1346,18 +1346,18 @@ model EscalationTicket {
 // En V28 se agregará columna embedding vector(1536) + match semántico >0.92.
 
 model SemanticCache {
-  id        String    @id @default(cuid())
-  queryHash String    @unique // sha256 de "userId:agentName:normalized"
-  userId    String? // Opcional — null = respuesta "canónica" compartible
-  agentName ChatAgent
-  query     String // Query original (para debugging)
-  embedding Json? // V28 — array de floats opcional para match semántico cross-user (solo canónicas)
-  isCanonical Boolean @default(false) // V28 — true = respuesta sin datos personales, matcheable semántico entre usuarios
-  response  String
-  hits      Int       @default(0)
-  lastHitAt DateTime  @default(now())
-  expiresAt DateTime
-  createdAt DateTime  @default(now())
+  id          String    @id @default(cuid())
+  queryHash   String    @unique // sha256 de "userId:agentName:normalized"
+  userId      String? // Opcional — null = respuesta "canónica" compartible
+  agentName   ChatAgent
+  query       String // Query original (para debugging)
+  embedding   Json? // V28 — array de floats opcional para match semántico cross-user (solo canónicas)
+  isCanonical Boolean   @default(false) // V28 — true = respuesta sin datos personales, matcheable semántico entre usuarios
+  response    String
+  hits        Int       @default(0)
+  lastHitAt   DateTime  @default(now())
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
 
   @@index([agentName, expiresAt])
   @@index([userId])
@@ -1477,10 +1477,11 @@ model WhatsappAccount {
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
-  templates     WhatsappTemplate[]
-  conversations WhatsappConversation[]
-  contacts      WhatsappContact[]
-  workflows     WaWorkflow[]
+  templates         WhatsappTemplate[]
+  conversations     WhatsappConversation[]
+  contacts          WhatsappContact[]
+  workflows         WaWorkflow[]
+  WhatsappBroadcast WhatsappBroadcast[]
 
   @@index([userId])
 }
@@ -1513,11 +1514,95 @@ model WhatsappTemplate {
   fallbackTemplateId String?
   // Propósito lógico
   purpose            String // confirmation | retry | abandoned_cart | etc
+  // V29 — A/B testing: templates con el mismo variantGroup compiten por split aleatorio ponderado
+  variantGroup       String? // ej "confirmacion_co_2026q2"
+  weight             Float              @default(1) // peso en el split (mayor = más tráfico)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
+  broadcastRecipients WhatsappBroadcastRecipient[]
+
   @@unique([accountId, metaName, language])
   @@index([accountId, purpose])
+  @@index([accountId, variantGroup])
+}
+
+// ─────────────────────────────────────────────────────────
+// V29 — BROADCAST SEGMENTADO
+// ─────────────────────────────────────────────────────────
+// Envío de plantilla a un grupo filtrado de contactos.
+// Respeta opt-out (WhatsappContact.isOptedIn=false).
+
+enum WaBroadcastStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WaBroadcastRecipientStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  SKIPPED
+}
+
+model WhatsappBroadcast {
+  id              String            @id @default(cuid())
+  accountId       String
+  account         WhatsappAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name            String
+  templateName    String
+  languageCode    String            @default("es_CO")
+  bodyVariables   Json?
+  headerVariables Json?
+  // Segmentación — filtros evaluados al disparar
+  segmentFilter   Json // {segment?, tags?, country?, minLtv?, excludeTags?}
+  // Estado
+  status          WaBroadcastStatus @default(DRAFT)
+  scheduledFor    DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  // Métricas agregadas
+  totalRecipients Int               @default(0)
+  sentCount       Int               @default(0)
+  failedCount     Int               @default(0)
+  optedOutCount   Int               @default(0)
+  variantGroup    String? // si es A/B, reporta stats por variante
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  recipients WhatsappBroadcastRecipient[]
+
+  @@index([accountId, status])
+  @@index([scheduledFor])
+}
+
+model WhatsappBroadcastRecipient {
+  id            String                     @id @default(cuid())
+  broadcastId   String
+  broadcast     WhatsappBroadcast          @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  contactId     String
+  phoneE164     String
+  templateId    String?
+  template      WhatsappTemplate?          @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  variantKey    String? // "A" | "B" | ...
+  status        WaBroadcastRecipientStatus @default(PENDING)
+  metaMessageId String?
+  failureReason String?
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  readAt        DateTime?
+  createdAt     DateTime                   @default(now())
+
+  @@index([broadcastId, status])
+  @@index([contactId])
+  @@index([variantKey])
 }
 
 // Contacto — perfil extendido del comprador

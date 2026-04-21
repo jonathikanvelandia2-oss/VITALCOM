@@ -21,6 +21,7 @@ import { prisma } from '@/lib/db/prisma'
 import { sendTemplate, sendText, sendInteractive, sendMedia } from '@/lib/whatsapp/client'
 import { route } from '@/lib/ai/llm-router'
 import { createEscalationTicket } from '@/lib/ai/escalate'
+import { resolveTemplateVariant } from '@/lib/whatsapp/ab-testing'
 import {
   WaWorkflowStatus,
   type WaExecution,
@@ -274,10 +275,17 @@ async function stepSendTemplate(step: WorkflowStep, ctx: ExecutionContext) {
     value: resolveVariable(h.value, ctx.variables, contact),
   }))
 
+  // V29 — A/B split: si el template tiene variantGroup, elegir variante ponderada
+  const variant = await resolveTemplateVariant(ctx.accountId, config.templateName)
+  if (variant.variantKey) {
+    ctx.variables._abVariant = variant.variantKey
+    ctx.variables._abTemplate = variant.metaName
+  }
+
   return sendTemplate({
     accountId: ctx.accountId,
     toPhoneE164: contact.phoneE164,
-    templateName: config.templateName,
+    templateName: variant.metaName,
     languageCode: config.languageCode,
     headerVariables: headerVars,
     bodyVariables: bodyVars,

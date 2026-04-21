@@ -1,5 +1,70 @@
 # Vitalcom Platform — Changelog
 
+## [2.7.0] — 2026-04-21
+
+**V29 Templates library + Broadcast segmentado + A/B testing automático.**
+
+Siguiente pieza del blueprint V21. Da al VITALCOMMER control directo sobre sus plantillas Meta y la capacidad de enviar campañas segmentadas. A/B testing integrado: el workflow engine y el broadcast runner asignan variantes automáticamente por peso ponderado.
+
+### V29 — Templates + Broadcast + A/B (`this release`)
+
+**Schema Prisma (+2 modelos, +2 enums, +2 campos):**
+- `WhatsappTemplate.variantGroup String?` + `.weight Float @default(1)` — agrupa variantes A/B
+- `WhatsappBroadcast` — campaña segmentada con `segmentFilter` JSON + `variantGroup` opcional + métricas agregadas (totalRecipients, sentCount, failedCount)
+- `WhatsappBroadcastRecipient` — recipient asignado con `templateId` (variante) + `variantKey` (A/B/...) + `status` (PENDING/SENT/DELIVERED/READ/FAILED/SKIPPED)
+- Enums: `WaBroadcastStatus` + `WaBroadcastRecipientStatus`
+
+**A/B testing (`src/lib/whatsapp/ab-testing.ts`):**
+- `pickWeightedVariant()` — cumulative weighted random (0 cost)
+- `resolveTemplateVariant()` — dado templateName, busca variantes del mismo group y elige una ponderada
+- `getVariantStats()` — agrega por variante: sent/opened/clicked/blocked (template stats) + broadcast recipient counts
+- **Integración workflow engine**: `stepSendTemplate` ahora llama `resolveTemplateVariant` transparentemente — el workflow JSON no cambia, Meta automáticamente usa una de las variantes.
+
+**Broadcast runner (`src/lib/whatsapp/broadcast-runner.ts`):**
+- `resolveRecipients(accountId, filter)` — filtra por segment/tags/country/minLtv/excludeTags + respeta `isOptedIn`. Limite 5k para safety.
+- `prepareBroadcast()` — crea `WhatsappBroadcastRecipient` en batches de 500, asigna variante A/B si grupo presente
+- `executeBroadcast()` — envía en tandas de 50 con rate limit 200ms/msg, updates de status por recipient
+- `getBroadcastStats()` — agrega por status + por variantKey para dashboard
+- Respeta opt-out: `isOptedIn=false` se filtra antes de crear recipients
+
+**APIs nuevas:**
+- `GET /api/whatsapp/templates?accountId=x` · `POST` crear
+- `GET/PATCH/DELETE /api/whatsapp/templates/[id]`
+- `GET /api/whatsapp/templates/ab-stats?accountId=x&variantGroup=y`
+- `GET /api/whatsapp/broadcasts` · `POST` crear · `GET /[id]` con stats completos
+- `POST /api/whatsapp/broadcasts/[id]/execute` — ejecuta en background
+- `POST /api/whatsapp/broadcasts/preview` — cuenta recipients sin crear nada
+
+**Hooks React Query (`src/hooks/useWaTemplates.ts`):**
+- `useWaTemplates` / `useCreateWaTemplate` / `useUpdateWaTemplate` / `useDeleteWaTemplate`
+- `useAbStats` — refresca métricas por variante
+- `useBroadcasts` (refetch 10s para tracking RUNNING) / `useBroadcast` (refetch 5s) / `useCreateBroadcast` / `useExecuteBroadcast` / `usePreviewBroadcast`
+
+**UI admin:**
+- `/admin/whatsapp/templates` — lista con filtro por cuenta + formulario crear (metaName/category/language/purpose/bodyText/variantGroup/weight/footer) + toggle APPROVED/DISABLED + métricas (sent/opened/clicked/blocked) + **sección A/B groups** con tabla comparativa por variante y CTR automático
+- `/admin/whatsapp/broadcasts` — lista con progress bar + crear nuevo con **preview de recipients** antes de enviar + filtros (segment, tags include/exclude, country, minLtv) + select de plantilla y grupo A/B
+- `/admin/whatsapp/broadcasts/[id]` — detail con 5 KPI cards (Recipients/Pending/Sent/Read/Failed) + progress bar + **tabla A/B por variante con read rate** + timeline (creado/agendado/iniciado/completado)
+
+**Sidebar admin:** Plantillas WA (FileText + NEW) + Broadcasts WA (Megaphone + NEW) bajo Workflows.
+
+### Matriz de casos de uso
+
+| Caso | Sin V29 | Con V29 |
+|------|---------|---------|
+| Probar 2 copies de confirmación | Crear 2 workflows, A/B manual | 2 templates en mismo variantGroup + workflow los usa ponderado |
+| Campaña promo a 500 VIP | Hacer script manual | Broadcast + segmentFilter {segment:"vip"} + preview |
+| Recompra segmentada a 20 días | Solo el workflow de remarketing | + Broadcast manual si quieres empujar YA a un subset |
+| Medir qué copy convierte mejor | N/A | ab-stats endpoint + tabla en UI con CTR y read rate |
+
+### Pendiente V30
+- Visual workflow editor (canvas SVG drag-drop)
+- Shopify snippet production (requiere OAuth)
+- Broadcast scheduling real (cron ejecuta los SCHEDULED vencidos)
+- Template sync con Meta Graph API (fetch/push)
+- Opt-out link automático en body de MARKETING templates
+
+---
+
 ## [2.6.0] — 2026-04-21
 
 **V28 Optimizaciones de producción — Claude opt-in + Embeddings semánticos + Observabilidad + Rate limiting.**
