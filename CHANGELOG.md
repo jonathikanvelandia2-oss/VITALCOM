@@ -1,5 +1,40 @@
 # Vitalcom Platform — Changelog
 
+## [2.12.0] — 2026-04-21
+
+**V31 — Alertas proactivas para el dropshipper.**
+
+El dropshipper ya no necesita estar pendiente del admin: un cron horario detecta eventos que requieren atención (stock bajo, pedido en ruta, ROAS cayendo, resumen diario) y manda notificación in-app + WhatsApp al instante. Todo el stack funciona en MOCK mode sin credenciales Meta.
+
+**Schema:**
+- `ProactiveAlert` · `ProactiveAlertLog` · enums `ProactiveAlertType` (5 tipos) + `ProactiveAlertChannel` (IN_APP/WHATSAPP/BOTH)
+- Relación reversa en `User.proactiveAlerts`
+
+**Engine:**
+- `src/lib/alerts/engine.ts` — 5 evaluadores: `evalStockLow` · `evalOrderStatus` (DISPATCHED/DELIVERED) · `evalDailySummary` · `evalRoasDrop` · dispatcher `runAlertsEngine` con cooldown + log
+- `isOnCooldown()` función pura testeable
+- `evalRoasDrop` combina `AdSpendEntry.spend` (por AdAccount) con `Order.total` como proxy de revenue
+
+**APIs:**
+- `GET /api/alerts` — listar las del usuario
+- `POST /api/alerts` — crear (bloquea duplicados por tipo)
+- `PATCH /api/alerts/[id]` — toggle enabled/channel/config/cooldown
+- `DELETE /api/alerts/[id]` — borrar
+- `POST /api/alerts/[id]` — test manual (dry-run, no envía)
+- `GET|POST /api/alerts/cron` — cron Vercel con CRON_SECRET Bearer
+
+**UI comunidad:**
+- `/alertas` — página con alertas configuradas + disponibles · toggle enabled · selector canal (In-app / WhatsApp / Ambos) · botón "Probar" que muestra si dispararía · banner resultado · footer con explicación
+- Nav: entrada "Alertas" en `CommunitySidebar`
+
+**Hook React Query:**
+- `useAlerts`, `useCreateAlert`, `useUpdateAlert`, `useDeleteAlert`, `useTestAlert` + `ALERT_TYPE_META` con defaults
+
+**Cron:**
+- `vercel.json` entrada nueva `"/api/alerts/cron"` schedule `0 * * * *` (cada hora)
+
+**Tests:** 107/107 ✅ (+8 nuevos sobre `isOnCooldown`)
+
 ## [2.11.0] — 2026-04-21
 
 **Polish pre-producción — Opt-out auto-append + error boundaries segmentados.**

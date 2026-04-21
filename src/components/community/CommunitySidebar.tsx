@@ -34,6 +34,7 @@ import {
   LifeBuoy,
   Sun,
   History,
+  Bell,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 
@@ -84,6 +85,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/marketing', label: 'Marketing', icon: Megaphone },
       { href: '/automatizaciones', label: 'Automatizaciones', icon: Zap },
+      { href: '/alertas', label: 'Alertas', icon: Bell, badge: 'NEW' },
       { href: '/analitica', label: 'Analítica', icon: BarChart3 },
       { href: '/tareas', label: 'Tareas', icon: CheckSquare },
       { href: '/recursos', label: 'Biblioteca', icon: BookOpen },

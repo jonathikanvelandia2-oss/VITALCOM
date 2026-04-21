@@ -148,6 +148,8 @@ model User {
   // V27 — WhatsApp Commerce
   whatsappAccounts        WhatsappAccount[]
   waWorkflows             WaWorkflow[]
+  // V31 — Alertas proactivas
+  proactiveAlerts         ProactiveAlert[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1859,4 +1861,64 @@ model WebhookEvent {
 
   @@unique([source, externalId])
   @@index([source, processedAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+// V31 — Alertas proactivas para el dropshipper
+// ═══════════════════════════════════════════════════════════
+// Cron horario evalúa reglas activas de cada dropshipper y dispara
+// notificaciones in-app + WhatsApp cuando se cumple la condición.
+// Cooldown para evitar spam · log de entregas para debug.
+
+enum ProactiveAlertType {
+  STOCK_LOW           // Stock de un producto cayó bajo umbral en el país del dropshipper
+  ORDER_DISPATCHED    // Uno de sus pedidos pasó a DISPATCHED
+  ORDER_DELIVERED     // Uno de sus pedidos pasó a DELIVERED
+  DAILY_SUMMARY       // Resumen del día (pedidos + revenue + P&G)
+  ROAS_DROP           // ROAS cayó bajo umbral
+}
+
+enum ProactiveAlertChannel {
+  IN_APP              // Solo Notification (bell icon)
+  WHATSAPP            // Solo WhatsApp
+  BOTH                // Los dos
+}
+
+model ProactiveAlert {
+  id              String                @id @default(cuid())
+  userId          String
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            ProactiveAlertType
+  channel         ProactiveAlertChannel @default(IN_APP)
+  enabled         Boolean               @default(true)
+  // Config JSON depende del type:
+  //  STOCK_LOW       → { threshold: number, productSkus?: string[] }
+  //  ORDER_DISPATCHED → { includeTracking: boolean }
+  //  DAILY_SUMMARY   → { hour: number (0-23 local) }
+  //  ROAS_DROP       → { threshold: number, windowHours: number }
+  config          Json                  @default("{}")
+  cooldownMinutes Int                   @default(1440) // 24h default
+  lastTriggeredAt DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  logs ProactiveAlertLog[]
+
+  @@index([userId, type, enabled])
+}
+
+model ProactiveAlertLog {
+  id           String         @id @default(cuid())
+  alertId      String
+  alert        ProactiveAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  // Contexto del disparo
+  payload      Json // snapshot de los datos que motivaron el alert
+  // Envío
+  deliveredAt  DateTime       @default(now())
+  channel      ProactiveAlertChannel
+  whatsappSent Boolean        @default(false)
+  notifyId     String? // id de Notification si se creó
+  errorMessage String?
+
+  @@index([alertId, deliveredAt])
 }
