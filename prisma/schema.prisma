@@ -33,12 +33,12 @@ enum Country {
 }
 
 enum Area {
-  DIRECCION       // CEO — acceso total
-  MARKETING       // Campañas, contenido, comunidad
-  COMERCIAL       // Ventas, clientes, catálogo
-  ADMINISTRATIVA  // Operaciones, RRHH, procesos
-  LOGISTICA       // Stock, despachos, fulfillment Dropi
-  CONTABILIDAD    // Finanzas, facturación, liquidaciones
+  DIRECCION // CEO — acceso total
+  MARKETING // Campañas, contenido, comunidad
+  COMERCIAL // Ventas, clientes, catálogo
+  ADMINISTRATIVA // Operaciones, RRHH, procesos
+  LOGISTICA // Stock, despachos, fulfillment Dropi
+  CONTABILIDAD // Finanzas, facturación, liquidaciones
 }
 
 enum OrderStatus {
@@ -65,26 +65,26 @@ enum FinanceType {
 }
 
 enum FinanceCategory {
-  VENTA               // Ingreso por venta de orden
-  COSTO_PRODUCTO      // COGS (costo directo del producto)
-  ENVIO               // Costo de envío al cliente
-  PUBLICIDAD          // Meta, TikTok, Google ads
+  VENTA // Ingreso por venta de orden
+  COSTO_PRODUCTO // COGS (costo directo del producto)
+  ENVIO // Costo de envío al cliente
+  PUBLICIDAD // Meta, TikTok, Google ads
   COMISION_PLATAFORMA // Shopify, pasarela, Vitalcom
-  DEVOLUCION          // Reembolso o devolución
-  EMPAQUE             // Material de empaque
-  OPERATIVO           // Gastos operativos (internet, software)
-  IMPUESTO            // IVA, retenciones
-  OTRO                // Catch-all manual
+  DEVOLUCION // Reembolso o devolución
+  EMPAQUE // Material de empaque
+  OPERATIVO // Gastos operativos (internet, software)
+  IMPUESTO // IVA, retenciones
+  OTRO // Catch-all manual
 }
 
 enum FinanceSource {
-  MANUAL          // Registrado por el usuario
-  ORDER_REVENUE   // Auto-generado al entregar orden
-  ORDER_COGS      // Auto-generado al entregar orden
-  ORDER_SHIPPING  // Auto-generado al entregar orden
-  ORDER_RETURN    // Auto-generado al devolver orden
-  AD_SPEND        // Importado de Meta/TikTok/Google (Fase V2)
-  SYSTEM          // Otro auto
+  MANUAL // Registrado por el usuario
+  ORDER_REVENUE // Auto-generado al entregar orden
+  ORDER_COGS // Auto-generado al entregar orden
+  ORDER_SHIPPING // Auto-generado al entregar orden
+  ORDER_RETURN // Auto-generado al devolver orden
+  AD_SPEND // Importado de Meta/TikTok/Google (Fase V2)
+  SYSTEM // Otro auto
 }
 
 // ─────────────────────────────────────────────────────────
@@ -92,54 +92,59 @@ enum FinanceSource {
 // ─────────────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  password      String?
-  role          UserRole  @default(COMMUNITY)
-  country       Country?
-  area          Area?
-  avatar        String?
-  phone         String?
-  whatsapp      String?
+  id       String   @id @default(cuid())
+  email    String   @unique
+  name     String?
+  password String?
+  role     UserRole @default(COMMUNITY)
+  country  Country?
+  area     Area?
+  avatar   String?
+  phone    String?
+  whatsapp String?
 
   // Comunidad / gamificación
-  level         Int       @default(1)
-  points        Int       @default(0)
-  bio           String?
+  level  Int     @default(1)
+  points Int     @default(0)
+  bio    String?
 
   // Estado
-  active        Boolean   @default(true)
-  verified      Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  active    Boolean  @default(true)
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relaciones
-  posts            Post[]
-  comments         Comment[]
-  inboxSent        InboxMessage[]      @relation("MessageSender")
-  inboxReceived    InboxMessage[]      @relation("MessageReceiver")
-  orders           Order[]
-  pricingCalcs     PricingCalculation[]
-  workflows        WorkflowTemplate[]
-  courseProgress    CourseProgress[]
-  shopifyStores    ShopifyStore[]
-  tasks            Task[]
-  meetings         Meeting[]
-  uploadedDocs     Document[]          @relation("UploadedDocs")
-  financeEntries   FinanceEntry[]
-  notifications    Notification[]
-  conversationsA   Conversation[]      @relation("ConversationUserA")
-  conversationsB   Conversation[]      @relation("ConversationUserB")
-  directMessages   DirectMessage[]     @relation("DirectMessageSender")
-  workflowActivations UserWorkflowActivation[]
-  adAccounts       AdAccount[]
-  campaignDrafts   CampaignDraft[]
+  posts                   Post[]
+  comments                Comment[]
+  inboxSent               InboxMessage[]           @relation("MessageSender")
+  inboxReceived           InboxMessage[]           @relation("MessageReceiver")
+  orders                  Order[]
+  pricingCalcs            PricingCalculation[]
+  workflows               WorkflowTemplate[]
+  courseProgress          CourseProgress[]
+  shopifyStores           ShopifyStore[]
+  tasks                   Task[]
+  meetings                Meeting[]
+  uploadedDocs            Document[]               @relation("UploadedDocs")
+  financeEntries          FinanceEntry[]
+  notifications           Notification[]
+  conversationsA          Conversation[]           @relation("ConversationUserA")
+  conversationsB          Conversation[]           @relation("ConversationUserB")
+  directMessages          DirectMessage[]          @relation("DirectMessageSender")
+  workflowActivations     UserWorkflowActivation[]
+  adAccounts              AdAccount[]
+  campaignDrafts          CampaignDraft[]
   campaignRecommendations CampaignRecommendation[]
-  adCreatives      AdCreative[]
-  storeOptimizations StoreOptimization[]
-  appliedActions   AppliedAction[]
-  goals            UserGoal[]
+  adCreatives             AdCreative[]
+  storeOptimizations      StoreOptimization[]
+  appliedActions          AppliedAction[]
+  goals                   UserGoal[]
+  // V26 — Chat universal IA
+  conversationThreads     ConversationThread[]
+  userMemories            UserMemory[]
+  escalationTickets       EscalationTicket[]       @relation("EscalationUser")
+  escalationAssigned      EscalationTicket[]       @relation("EscalationAssignee")
 }
 
 // ─────────────────────────────────────────────────────────
@@ -147,66 +152,66 @@ model User {
 // ─────────────────────────────────────────────────────────
 
 model Product {
-  id               String      @id @default(cuid())
-  sku              String      @unique
-  name             String
-  slug             String      @unique
-  description      String?
-  category         String?
-  subcategory      String?
-  tags             String[]
-  images           String[]
+  id                 String   @id @default(cuid())
+  sku                String   @unique
+  name               String
+  slug               String   @unique
+  description        String?
+  category           String?
+  subcategory        String?
+  tags               String[]
+  images             String[]
   // 8 niveles de precio Vitalcom (COP)
-  precioPublico    Float       // Precio consumidor final
-  precioComunidad  Float       // Precio miembros / dropshippers
-  precioPrivado    Float       // Precio VIP
+  precioPublico      Float // Precio consumidor final
+  precioComunidad    Float // Precio miembros / dropshippers
+  precioPrivado      Float // Precio VIP
   // Internos (solo admin)
-  precioCosto          Float?  // Costo de compra
-  precioMayorProv      Float?  // Mayor proveeduría
-  precioMayorContado   Float?  // Mayor contado
-  precioMayorCredito   Float?  // Mayor crédito
-  precioMaquilla       Float?  // Precio maquila
+  precioCosto        Float? // Costo de compra
+  precioMayorProv    Float? // Mayor proveeduría
+  precioMayorContado Float? // Mayor contado
+  precioMayorCredito Float? // Mayor crédito
+  precioMaquilla     Float? // Precio maquila
 
   // Datos extendidos del catálogo
-  marca            String?     // Marca del producto
-  contenido        String?     // "60U", "500ML", "1200G"
-  presentacion     String?     // Capsulas, Liquido, Polvos, etc.
-  sabor            String?     // Natural, Uva, Fresa, etc.
-  bodega           String?     // BIOBEL, VITALCOM
-  codigoInterno    String?     // Código original de la base
-  pertenece        String?     // Dueño/influencer (para maquilas)
-  weight           Float?
-  dimensions       Json?
-  active           Boolean     @default(true)
-  bestseller       Boolean     @default(false)
-  salesCount       Int         @default(0)
+  marca         String? // Marca del producto
+  contenido     String? // "60U", "500ML", "1200G"
+  presentacion  String? // Capsulas, Liquido, Polvos, etc.
+  sabor         String? // Natural, Uva, Fresa, etc.
+  bodega        String? // BIOBEL, VITALCOM
+  codigoInterno String? // Código original de la base
+  pertenece     String? // Dueño/influencer (para maquilas)
+  weight        Float?
+  dimensions    Json?
+  active        Boolean @default(true)
+  bestseller    Boolean @default(false)
+  salesCount    Int     @default(0)
 
   // Landing page del producto
-  videoUrl         String?              // Video parallax (Cloudinary URL)
-  ingredients      Json?                // [{name, description, icon}]
-  benefits         Json?                // [{title, description, icon}]
-  howToUse         String?              // Instrucciones de uso
-  testimonials     Json?                // [{name, text, rating, photo}]
-  landingConfig    Json?                // {heroText, ctaText, accentColor, sections[]}
+  videoUrl      String? // Video parallax (Cloudinary URL)
+  ingredients   Json? // [{name, description, icon}]
+  benefits      Json? // [{title, description, icon}]
+  howToUse      String? // Instrucciones de uso
+  testimonials  Json? // [{name, text, rating, photo}]
+  landingConfig Json? // {heroText, ctaText, accentColor, sections[]}
 
-  stock            Stock[]
-  orderItems       OrderItem[]
-  shopifySync      ProductSync[]
-  campaignDrafts   CampaignDraft[]
-  adCreatives      AdCreative[]
+  stock              Stock[]
+  orderItems         OrderItem[]
+  shopifySync        ProductSync[]
+  campaignDrafts     CampaignDraft[]
+  adCreatives        AdCreative[]
   storeOptimizations StoreOptimization[]
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }
 
 model Stock {
-  id         String   @id @default(cuid())
-  productId  String
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  country    Country
-  quantity   Int      @default(0)
-  warehouse  String?
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  country   Country
+  quantity  Int      @default(0)
+  warehouse String?
+  updatedAt DateTime @updatedAt
 
   @@unique([productId, country])
 }
@@ -216,31 +221,31 @@ model Stock {
 // ─────────────────────────────────────────────────────────
 
 model Order {
-  id              String      @id @default(cuid())
-  number          String      @unique
-  userId          String?
-  user            User?       @relation(fields: [userId], references: [id])
-  source          OrderSource
-  country         Country
-  status          OrderStatus @default(PENDING)
+  id      String      @id @default(cuid())
+  number  String      @unique
+  userId  String?
+  user    User?       @relation(fields: [userId], references: [id])
+  source  OrderSource
+  country Country
+  status  OrderStatus @default(PENDING)
 
   customerName    String
   customerEmail   String
   customerPhone   String?
   customerAddress String?
 
-  items           OrderItem[]
-  subtotal        Float
-  shipping        Float
-  total           Float
+  items    OrderItem[]
+  subtotal Float
+  shipping Float
+  total    Float
 
-  trackingCode    String?
-  carrier         String?
-  notes           String?
-  externalRef     String?
+  trackingCode String?
+  carrier      String?
+  notes        String?
+  externalRef  String?
 
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, createdAt])
   @@index([userId, status])
@@ -348,15 +353,15 @@ model Course {
 }
 
 model CourseProgress {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  courseId    String
-  course      Course   @relation(fields: [courseId], references: [id])
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  courseId         String
+  course           Course   @relation(fields: [courseId], references: [id])
   completedLessons String[]
-  percentage  Int      @default(0)
-  completed   Boolean  @default(false)
-  updatedAt   DateTime @updatedAt
+  percentage       Int      @default(0)
+  completed        Boolean  @default(false)
+  updatedAt        DateTime @updatedAt
 
   @@unique([userId, courseId])
 }
@@ -383,13 +388,13 @@ model WorkflowTemplate {
   id          String   @id @default(cuid())
   userId      String?
   user        User?    @relation(fields: [userId], references: [id])
-  slug        String?  @unique             // Identificador legible para plantillas oficiales (ej: confirm-order)
+  slug        String?  @unique // Identificador legible para plantillas oficiales (ej: confirm-order)
   name        String
   description String?
   emoji       String?
   category    String
-  target      String?                       // Audiencia del flujo (Nuevos pedidos, Leads, etc.)
-  impact      String?                       // Etiqueta de resultado esperado
+  target      String? // Audiencia del flujo (Nuevos pedidos, Leads, etc.)
+  impact      String? // Etiqueta de resultado esperado
   steps       Json
   isPublic    Boolean  @default(false)
   uses        Int      @default(0)
@@ -405,17 +410,17 @@ enum WorkflowStatus {
 }
 
 model UserWorkflowActivation {
-  id          String         @id @default(cuid())
-  userId      String
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  templateId  String
-  template    WorkflowTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  status      WorkflowStatus @default(ACTIVE)
-  executions  Int            @default(0)
-  successCount Int           @default(0)
-  lastRunAt   DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id           String           @id @default(cuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templateId   String
+  template     WorkflowTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  status       WorkflowStatus   @default(ACTIVE)
+  executions   Int              @default(0)
+  successCount Int              @default(0)
+  lastRunAt    DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   @@unique([userId, templateId])
   @@index([userId])
@@ -426,35 +431,35 @@ model UserWorkflowActivation {
 // ─────────────────────────────────────────────────────────
 
 model ShopifyStore {
-  id              String    @id @default(cuid())
-  userId          String
-  user            User      @relation(fields: [userId], references: [id])
-  shopDomain      String    @unique   // mi-tienda.myshopify.com
-  storeName       String
-  accessToken     String?              // Token cifrado de Shopify API
-  status          String    @default("not_connected")
-  plan            String?
-  productsCount   Int       @default(0)
-  connectedAt     DateTime?
-  lastSyncAt      DateTime?
-  syncedProducts  ProductSync[]
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  shopDomain     String        @unique // mi-tienda.myshopify.com
+  storeName      String
+  accessToken    String? // Token cifrado de Shopify API
+  status         String        @default("not_connected")
+  plan           String?
+  productsCount  Int           @default(0)
+  connectedAt    DateTime?
+  lastSyncAt     DateTime?
+  syncedProducts ProductSync[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model ProductSync {
-  id                 String    @id @default(cuid())
-  shopifyStoreId     String
-  store              ShopifyStore @relation(fields: [shopifyStoreId], references: [id], onDelete: Cascade)
-  productId          String
-  product            Product   @relation(fields: [productId], references: [id])
-  shopifyProductId   String
-  shopifyVariantId   String?
-  sellingPrice       Float     // Precio que el dropshipper puso en Shopify
-  status             String    @default("active")
-  soldTotal          Int       @default(0)
-  lastSyncAt         DateTime  @default(now())
-  createdAt          DateTime  @default(now())
+  id               String       @id @default(cuid())
+  shopifyStoreId   String
+  store            ShopifyStore @relation(fields: [shopifyStoreId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product      @relation(fields: [productId], references: [id])
+  shopifyProductId String
+  shopifyVariantId String?
+  sellingPrice     Float // Precio que el dropshipper puso en Shopify
+  status           String       @default("active")
+  soldTotal        Int          @default(0)
+  lastSyncAt       DateTime     @default(now())
+  createdAt        DateTime     @default(now())
 
   @@unique([shopifyStoreId, productId])
 }
@@ -464,40 +469,40 @@ model ProductSync {
 // ─────────────────────────────────────────────────────────
 
 model Task {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  title       String
+  description String?
+  status      String    @default("pending") // pending, in_progress, completed
+  priority    String    @default("medium") // low, medium, high
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Meeting {
   id          String   @id @default(cuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id])
   title       String
   description String?
-  status      String   @default("pending") // pending, in_progress, completed
-  priority    String   @default("medium")  // low, medium, high
-  dueDate     DateTime?
+  date        DateTime
+  duration    Int      @default(60) // minutos
+  link        String? // URL de meet/zoom
+  type        String   @default("videocall") // videocall, presencial
+  status      String   @default("scheduled") // scheduled, completed, cancelled
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-}
-
-model Meeting {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id])
-  title        String
-  description  String?
-  date         DateTime
-  duration     Int      @default(60) // minutos
-  link         String?               // URL de meet/zoom
-  type         String   @default("videocall") // videocall, presencial
-  status       String   @default("scheduled") // scheduled, completed, cancelled
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
 }
 
 model Resource {
   id          String   @id @default(cuid())
   title       String
   description String?
-  category    String                    // guias, plantillas, videos, ebooks
+  category    String // guias, plantillas, videos, ebooks
   type        String   @default("file") // file, link, video
-  url         String                    // URL del archivo o enlace
+  url         String // URL del archivo o enlace
   thumbnail   String?
   downloads   Int      @default(0)
   published   Boolean  @default(true)
@@ -506,16 +511,16 @@ model Resource {
 }
 
 model Document {
-  id          String   @id @default(cuid())
-  name        String
-  folder      String   @default("general") // general, legal, marketing, logistica
-  type        String                       // pdf, excel, doc, imagen
-  url         String
-  size        Int      @default(0)          // bytes
-  uploadedBy  String
-  uploader    User     @relation("UploadedDocs", fields: [uploadedBy], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  folder     String   @default("general") // general, legal, marketing, logistica
+  type       String // pdf, excel, doc, imagen
+  url        String
+  size       Int      @default(0) // bytes
+  uploadedBy String
+  uploader   User     @relation("UploadedDocs", fields: [uploadedBy], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 // ─────────────────────────────────────────────────────────
@@ -547,24 +552,24 @@ model EmailVerificationToken {
 // El P&L se calcula agregando por periodo, tipo y categoría.
 
 model FinanceEntry {
-  id             String           @id @default(cuid())
-  userId         String
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  date           DateTime         @default(now())
-  type           FinanceType
-  category       FinanceCategory
-  amount         Float             // Siempre positivo; el tipo indica signo
-  currency       String           @default("COP")
-  description    String?
-  source         FinanceSource    @default(MANUAL)
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date        DateTime        @default(now())
+  type        FinanceType
+  category    FinanceCategory
+  amount      Float // Siempre positivo; el tipo indica signo
+  currency    String          @default("COP")
+  description String?
+  source      FinanceSource   @default(MANUAL)
 
   // Referencias opcionales para rastrear origen
-  relatedOrderId    String?
-  relatedProductId  String?
-  metadata          Json?         // Flexible: platformId, campaignId, adId (fase V2+)
+  relatedOrderId   String?
+  relatedProductId String?
+  metadata         Json? // Flexible: platformId, campaignId, adId (fase V2+)
 
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, date])
   @@index([userId, type, category])
@@ -585,25 +590,25 @@ enum AdPlatform {
   META
   TIKTOK
   GOOGLE
-  OTHER              // Prensa, influencers, OOH — gastos no digitales
+  OTHER // Prensa, influencers, OOH — gastos no digitales
 }
 
 model AdAccount {
-  id          String     @id @default(cuid())
-  userId      String
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  platform    AdPlatform
-  accountId   String                           // ID externo (Meta/TikTok/Google) o label libre
-  accountName String?
-  currency    String     @default("COP")
-  connected   Boolean    @default(false)       // false = manual, true = OAuth conectado
-  accessToken String?                          // Cuando llegue OAuth real
-  refreshToken String?
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform       AdPlatform
+  accountId      String // ID externo (Meta/TikTok/Google) o label libre
+  accountName    String?
+  currency       String     @default("COP")
+  connected      Boolean    @default(false) // false = manual, true = OAuth conectado
+  accessToken    String? // Cuando llegue OAuth real
+  refreshToken   String?
   tokenExpiresAt DateTime?
-  lastSyncAt  DateTime?
-  active      Boolean    @default(true)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  lastSyncAt     DateTime?
+  active         Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
   campaigns       AdCampaign[]
   spendEntries    AdSpendEntry[]
@@ -614,17 +619,17 @@ model AdAccount {
 }
 
 model AdCampaign {
-  id          String     @id @default(cuid())
-  accountId   String
-  account     AdAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  externalId  String?                         // ID en la plataforma (cuando OAuth)
-  name        String
-  objective   String?                         // CONVERSIONS, TRAFFIC, AWARENESS, LEADS
-  status      String     @default("ACTIVE")   // ACTIVE, PAUSED, ENDED
-  startDate   DateTime?
-  endDate     DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id         String    @id @default(cuid())
+  accountId  String
+  account    AdAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  externalId String? // ID en la plataforma (cuando OAuth)
+  name       String
+  objective  String? // CONVERSIONS, TRAFFIC, AWARENESS, LEADS
+  status     String    @default("ACTIVE") // ACTIVE, PAUSED, ENDED
+  startDate  DateTime?
+  endDate    DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   spendEntries    AdSpendEntry[]
   recommendations CampaignRecommendation[]
@@ -633,21 +638,21 @@ model AdCampaign {
 }
 
 model AdSpendEntry {
-  id             String     @id @default(cuid())
+  id             String      @id @default(cuid())
   accountId      String
-  account        AdAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account        AdAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
   campaignId     String?
   campaign       AdCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  date           DateTime   @db.Date
-  spend          Float                         // Gasto en la moneda de la cuenta
+  date           DateTime    @db.Date
+  spend          Float // Gasto en la moneda de la cuenta
   impressions    Int?
   clicks         Int?
   conversions    Int?
-  source         String     @default("MANUAL") // MANUAL, API_SYNC
-  financeEntryId String?    @unique            // Link al FinanceEntry auto-generado
+  source         String      @default("MANUAL") // MANUAL, API_SYNC
+  financeEntryId String?     @unique // Link al FinanceEntry auto-generado
   notes          String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
   @@index([accountId, date])
   @@index([campaignId, date])
@@ -662,17 +667,17 @@ model AdSpendEntry {
 // el disparador del evento — este modelo es solo para el bell.
 
 enum NotificationType {
-  ORDER_STATUS      // Pedido cambió de estado (DISPATCHED / DELIVERED / etc.)
-  ORDER_NEW         // Nuevo pedido recibido (staff)
-  INBOX_MESSAGE     // Mensaje nuevo en hilo del inbox
-  INBOX_ASSIGNED    // Hilo reasignado a tu área
-  COMMUNITY_LIKE    // Like a tu post/comentario
-  COMMUNITY_REPLY   // Respuesta a tu comentario
-  COMMUNITY_DM      // Mensaje directo 1:1 en comunidad
-  STORE_CONNECTED   // Tienda Shopify conectada
-  AI_ACTION         // V20 — Acción IA crítica del Command Center
-  MORNING_BRIEF     // V25 — Brief diario del día (8AM con top 3 + KPIs)
-  SYSTEM            // Anuncios de plataforma
+  ORDER_STATUS // Pedido cambió de estado (DISPATCHED / DELIVERED / etc.)
+  ORDER_NEW // Nuevo pedido recibido (staff)
+  INBOX_MESSAGE // Mensaje nuevo en hilo del inbox
+  INBOX_ASSIGNED // Hilo reasignado a tu área
+  COMMUNITY_LIKE // Like a tu post/comentario
+  COMMUNITY_REPLY // Respuesta a tu comentario
+  COMMUNITY_DM // Mensaje directo 1:1 en comunidad
+  STORE_CONNECTED // Tienda Shopify conectada
+  AI_ACTION // V20 — Acción IA crítica del Command Center
+  MORNING_BRIEF // V25 — Brief diario del día (8AM con top 3 + KPIs)
+  SYSTEM // Anuncios de plataforma
 }
 
 model Notification {
@@ -682,8 +687,8 @@ model Notification {
   type      NotificationType
   title     String
   body      String?
-  link      String?          // Ruta interna para redirigir al hacer click
-  meta      Json?            // Payload adicional (orderNumber, threadId, etc.)
+  link      String? // Ruta interna para redirigir al hacer click
+  meta      Json? // Payload adicional (orderNumber, threadId, etc.)
   read      Boolean          @default(false)
   createdAt DateTime         @default(now())
 
@@ -699,17 +704,17 @@ model Notification {
 // — eso hace el índice único determinístico sin importar quién inicia.
 
 model Conversation {
-  id            String           @id @default(cuid())
+  id            String          @id @default(cuid())
   userAId       String
-  userA         User             @relation("ConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userA         User            @relation("ConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
   userBId       String
-  userB         User             @relation("ConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
-  lastMessageAt DateTime         @default(now())
-  lastPreview   String?          // Últimos ~120 chars para la lista
-  unreadForA    Int              @default(0)
-  unreadForB    Int              @default(0)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  userB         User            @relation("ConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  lastMessageAt DateTime        @default(now())
+  lastPreview   String? // Últimos ~120 chars para la lista
+  unreadForA    Int             @default(0)
+  unreadForB    Int             @default(0)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
   messages      DirectMessage[]
 
   @@unique([userAId, userBId])
@@ -718,14 +723,14 @@ model Conversation {
 }
 
 model DirectMessage {
-  id             String        @id @default(cuid())
+  id             String       @id @default(cuid())
   conversationId String
-  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   senderId       String
-  sender         User          @relation("DirectMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  sender         User         @relation("DirectMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
   body           String
-  readAt         DateTime?     // Timestamp cuando el otro participante lo leyó
-  createdAt      DateTime      @default(now())
+  readAt         DateTime? // Timestamp cuando el otro participante lo leyó
+  createdAt      DateTime     @default(now())
 
   @@index([conversationId, createdAt])
 }
@@ -735,18 +740,18 @@ model DirectMessage {
 // ─────────────────────────────────────────────────────────
 
 model Event {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
   description String?
   date        DateTime
   endDate     DateTime?
-  link        String?              // URL de meet/zoom/teams
-  type        String   @default("webinar") // webinar, live, meetup, workshop
+  link        String? // URL de meet/zoom/teams
+  type        String    @default("webinar") // webinar, live, meetup, workshop
   speaker     String?
   cover       String?
-  published   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  published   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 // ─────────────────────────────────────────────────────────
@@ -757,9 +762,9 @@ model Event {
 // se crea un AdCampaign real y el externalId llega del API.
 
 enum DraftStatus {
-  DRAFT       // Borrador — wizard en curso
-  READY       // Completo, esperando OAuth o botón "Publicar"
-  LAUNCHED    // Publicado en plataforma
+  DRAFT // Borrador — wizard en curso
+  READY // Completo, esperando OAuth o botón "Publicar"
+  LAUNCHED // Publicado en plataforma
   PAUSED
   ARCHIVED
 }
@@ -774,48 +779,48 @@ enum CampaignObjective {
 }
 
 model CampaignDraft {
-  id            String     @id @default(cuid())
-  userId        String
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productId     String?
-  product       Product?   @relation(fields: [productId], references: [id], onDelete: SetNull)
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
-  name          String
-  platform      AdPlatform        @default(META)
-  objective     CampaignObjective @default(CONVERSIONS)
-  status        DraftStatus       @default(DRAFT)
-  step          Int               @default(1) // Paso actual del wizard (1-5)
+  name      String
+  platform  AdPlatform        @default(META)
+  objective CampaignObjective @default(CONVERSIONS)
+  status    DraftStatus       @default(DRAFT)
+  step      Int               @default(1) // Paso actual del wizard (1-5)
 
   // Paso 2 — Audiencia
   targetCountry Country?
-  ageMin        Int?              @default(18)
-  ageMax        Int?              @default(55)
-  gender        String?           @default("ALL") // ALL, MALE, FEMALE
+  ageMin        Int?     @default(18)
+  ageMax        Int?     @default(55)
+  gender        String?  @default("ALL") // ALL, MALE, FEMALE
   interests     String[]
   placements    String[]
 
   // Paso 3 — Creativo
-  headline      String?
-  primaryText   String?
-  description   String?
-  cta           String?           @default("BUY_NOW")
-  imageUrl      String?
-  videoUrl      String?
-  landingUrl    String?
+  headline    String?
+  primaryText String?
+  description String?
+  cta         String? @default("BUY_NOW")
+  imageUrl    String?
+  videoUrl    String?
+  landingUrl  String?
 
   // Paso 4 — Presupuesto
-  dailyBudget   Float?
-  totalBudget   Float?
-  durationDays  Int?              @default(7)
-  startDate     DateTime?
+  dailyBudget  Float?
+  totalBudget  Float?
+  durationDays Int?      @default(7)
+  startDate    DateTime?
 
   // Resultado de lanzamiento
-  launchedCampaignId String?      // -> AdCampaign.id cuando se publique
-  externalId         String?      // ID en la plataforma tras OAuth launch
-  launchNotes        String?      // Errores de launch, warnings
+  launchedCampaignId String? // -> AdCampaign.id cuando se publique
+  externalId         String? // ID en la plataforma tras OAuth launch
+  launchNotes        String? // Errores de launch, warnings
 
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, status])
 }
@@ -827,14 +832,14 @@ model CampaignDraft {
 // (pausar/escalar/testear) con reasoning IA + métricas reales.
 
 enum RecommendationType {
-  PAUSE_CAMPAIGN        // ROAS bajo sostenido
-  SCALE_BUDGET          // ROAS alto consistente
-  REDUCE_BUDGET         // ROAS marginal, reduce en vez de pausar
-  TEST_CREATIVE         // CTR bajo, fatiga de creativo
-  TEST_AUDIENCE         // Frecuencia alta, audiencia saturada
-  OPTIMIZE_BID          // CPC alto vs benchmark
-  RESTART_CAMPAIGN      // Campaña pausada con potencial
-  ADD_TRACKING          // Falta datos para decidir
+  PAUSE_CAMPAIGN // ROAS bajo sostenido
+  SCALE_BUDGET // ROAS alto consistente
+  REDUCE_BUDGET // ROAS marginal, reduce en vez de pausar
+  TEST_CREATIVE // CTR bajo, fatiga de creativo
+  TEST_AUDIENCE // Frecuencia alta, audiencia saturada
+  OPTIMIZE_BID // CPC alto vs benchmark
+  RESTART_CAMPAIGN // Campaña pausada con potencial
+  ADD_TRACKING // Falta datos para decidir
 }
 
 enum RecommendationStatus {
@@ -845,39 +850,39 @@ enum RecommendationStatus {
 }
 
 model CampaignRecommendation {
-  id            String              @id @default(cuid())
-  userId        String
-  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  campaignId    String?
-  campaign      AdCampaign?         @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  accountId     String?
-  account       AdAccount?          @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId String?
+  campaign   AdCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  accountId  String?
+  account    AdAccount?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
 
-  type          RecommendationType
-  status        RecommendationStatus @default(PENDING)
-  priority      Int                 @default(50)        // 0 (baja) - 100 (crítica)
+  type     RecommendationType
+  status   RecommendationStatus @default(PENDING)
+  priority Int                  @default(50) // 0 (baja) - 100 (crítica)
 
-  title         String                                  // "Pausa 'Colágeno CO — Mujeres 25-45'"
-  reasoning     String                                  // Por qué IA lo recomienda
-  actionLabel   String                                  // "Pausar ahora" / "Subir +30%"
-  suggestedValue Float?                                 // % o COP sugerido
+  title          String // "Pausa 'Colágeno CO — Mujeres 25-45'"
+  reasoning      String // Por qué IA lo recomienda
+  actionLabel    String // "Pausar ahora" / "Subir +30%"
+  suggestedValue Float? // % o COP sugerido
 
   // Snapshot de métricas al generar
-  roas          Float?
-  spend         Float?
-  revenue       Float?
-  clicks        Int?
-  conversions   Int?
-  impressions   Int?
-  confidence    Float?              @default(0.5)       // 0-1 certeza del modelo
+  roas        Float?
+  spend       Float?
+  revenue     Float?
+  clicks      Int?
+  conversions Int?
+  impressions Int?
+  confidence  Float? @default(0.5) // 0-1 certeza del modelo
 
   // Resultado
-  appliedAt     DateTime?
-  dismissedAt   DateTime?
-  expiresAt     DateTime                                // Recomendaciones caducan en 72h
+  appliedAt   DateTime?
+  dismissedAt DateTime?
+  expiresAt   DateTime // Recomendaciones caducan en 72h
 
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, status])
   @@index([campaignId])
@@ -891,14 +896,14 @@ model CampaignRecommendation {
 // Cada creativo se puede lanzar directamente desde el Lanzador.
 
 enum CreativeAngle {
-  BENEFIT            // Destaca beneficio principal
-  PAIN_POINT         // Dolor del cliente resuelto
-  SOCIAL_PROOF       // Testimonios / números
-  URGENCY            // Escasez / oferta
-  LIFESTYLE          // Estilo de vida aspiracional
-  TESTIMONIAL        // Caso real
-  BEFORE_AFTER       // Transformación
-  PROBLEM_SOLUTION   // Problema → producto
+  BENEFIT // Destaca beneficio principal
+  PAIN_POINT // Dolor del cliente resuelto
+  SOCIAL_PROOF // Testimonios / números
+  URGENCY // Escasez / oferta
+  LIFESTYLE // Estilo de vida aspiracional
+  TESTIMONIAL // Caso real
+  BEFORE_AFTER // Transformación
+  PROBLEM_SOLUTION // Problema → producto
 }
 
 enum CreativeStatus {
@@ -908,44 +913,44 @@ enum CreativeStatus {
 }
 
 enum CreativeRatio {
-  SQUARE             // 1:1 — feed Meta/TikTok
-  PORTRAIT           // 4:5 — feed vertical
-  STORY              // 9:16 — stories/reels
-  LANDSCAPE          // 16:9 — YouTube/Display
+  SQUARE // 1:1 — feed Meta/TikTok
+  PORTRAIT // 4:5 — feed vertical
+  STORY // 9:16 — stories/reels
+  LANDSCAPE // 16:9 — YouTube/Display
 }
 
 model AdCreative {
-  id            String          @id @default(cuid())
-  userId        String
-  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productId     String
-  product       Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  angle         CreativeAngle
-  platform      AdPlatform      @default(META)
-  ratio         CreativeRatio   @default(SQUARE)
-  status        CreativeStatus  @default(READY)
+  angle    CreativeAngle
+  platform AdPlatform     @default(META)
+  ratio    CreativeRatio  @default(SQUARE)
+  status   CreativeStatus @default(READY)
 
   // Copy generado
-  headline      String
-  primaryText   String
-  description   String?
-  cta           String?         @default("BUY_NOW")
-  hashtags      String[]
+  headline    String
+  primaryText String
+  description String?
+  cta         String?  @default("BUY_NOW")
+  hashtags    String[]
 
   // Imagen (URL Cloudinary o DALL-E)
-  imageUrl      String?
-  imagePrompt   String?         // Prompt usado para generar la imagen
+  imageUrl    String?
+  imagePrompt String? // Prompt usado para generar la imagen
 
   // Meta del creativo
-  score         Int             @default(70)           // Predicción IA 0-100
-  reasoning     String?                                 // Por qué IA eligió este ángulo
-  isFavorite    Boolean         @default(false)
-  timesUsed     Int             @default(0)            // Veces lanzado a Lanzador
-  lastUsedAt    DateTime?
+  score      Int       @default(70) // Predicción IA 0-100
+  reasoning  String? // Por qué IA eligió este ángulo
+  isFavorite Boolean   @default(false)
+  timesUsed  Int       @default(0) // Veces lanzado a Lanzador
+  lastUsedAt DateTime?
 
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, productId])
   @@index([userId, status])
@@ -960,13 +965,13 @@ model AdCreative {
 // Cada recomendación es accionable con 1 clic (aplicar/dismiss).
 
 enum OptimizationType {
-  HIGHLIGHT_PRODUCT    // Destacar producto ganador en home/tienda
-  PRICING_ADJUSTMENT   // Subir/bajar precio de venta
-  LANDING_COPY         // Mejorar copy de landing del producto
-  CROSS_SELL           // Agregar cross-sell a producto X con Y
-  PRODUCT_MIX          // Añadir/quitar producto del catálogo
-  MARGIN_IMPROVEMENT   // Producto con margen bajo → optimizar
-  RESTOCK_URGENT       // Stock bajo, restock antes que se agote
+  HIGHLIGHT_PRODUCT // Destacar producto ganador en home/tienda
+  PRICING_ADJUSTMENT // Subir/bajar precio de venta
+  LANDING_COPY // Mejorar copy de landing del producto
+  CROSS_SELL // Agregar cross-sell a producto X con Y
+  PRODUCT_MIX // Añadir/quitar producto del catálogo
+  MARGIN_IMPROVEMENT // Producto con margen bajo → optimizar
+  RESTOCK_URGENT // Stock bajo, restock antes que se agote
   REMOVE_UNDERPERFORMER // Producto sin ventas → remover
 }
 
@@ -978,38 +983,38 @@ enum OptimizationStatus {
 }
 
 model StoreOptimization {
-  id            String             @id @default(cuid())
-  userId        String
-  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productId     String?
-  product       Product?           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  type          OptimizationType
-  status        OptimizationStatus @default(PENDING)
-  priority      Int                @default(50)        // 0 (baja) - 100 (crítica)
+  type     OptimizationType
+  status   OptimizationStatus @default(PENDING)
+  priority Int                @default(50) // 0 (baja) - 100 (crítica)
 
-  title         String                                  // "Destaca Colágeno Premium en tu home"
-  reasoning     String                                  // Por qué IA lo recomienda
-  actionLabel   String                                  // "Destacar", "Ajustar precio", "Ver copy"
-  suggestedValue Float?                                 // Precio sugerido, % cambio, etc.
-  suggestedText String?                                 // Copy nuevo, sugerencia textual
-  suggestedData Json?                                   // Payload flexible (cross-sell targets, etc.)
+  title          String // "Destaca Colágeno Premium en tu home"
+  reasoning      String // Por qué IA lo recomienda
+  actionLabel    String // "Destacar", "Ajustar precio", "Ver copy"
+  suggestedValue Float? // Precio sugerido, % cambio, etc.
+  suggestedText  String? // Copy nuevo, sugerencia textual
+  suggestedData  Json? // Payload flexible (cross-sell targets, etc.)
 
   // Snapshot de métricas al generar
-  salesLast30   Int?
-  revenueLast30 Float?
-  marginPct     Float?
-  stockLevel    Int?
+  salesLast30    Int?
+  revenueLast30  Float?
+  marginPct      Float?
+  stockLevel     Int?
   conversionRate Float?
-  confidence    Float?             @default(0.7)       // 0-1 certeza del modelo
+  confidence     Float? @default(0.7) // 0-1 certeza del modelo
 
   // Resultado
-  appliedAt     DateTime?
-  dismissedAt   DateTime?
-  expiresAt     DateTime                                // Recomendaciones caducan en 14d
+  appliedAt   DateTime?
+  dismissedAt DateTime?
+  expiresAt   DateTime // Recomendaciones caducan en 14d
 
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, status])
   @@index([productId])
@@ -1029,40 +1034,40 @@ enum AppliedActionSource {
 }
 
 model AppliedAction {
-  id              String              @id @default(cuid())
-  userId          String
-  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  source          AppliedActionSource
-  actionType      String                                  // RecommendationType o OptimizationType
-  sourceRecId     String?                                 // id de la rec original (CampaignRecommendation/StoreOptimization)
+  source      AppliedActionSource
+  actionType  String // RecommendationType o OptimizationType
+  sourceRecId String? // id de la rec original (CampaignRecommendation/StoreOptimization)
 
   // Contexto descriptivo
-  title           String
-  productId       String?
-  campaignId      String?
+  title      String
+  productId  String?
+  campaignId String?
 
   // Snapshots
-  beforeSnapshot  Json                                    // { roas, spend, revenue, salesLast30, marginPct, stockLevel, etc. }
-  afterSnapshot   Json?                                   // Se rellena en el recompute >=7d post-apply
+  beforeSnapshot  Json // { roas, spend, revenue, salesLast30, marginPct, stockLevel, etc. }
+  afterSnapshot   Json? // Se rellena en el recompute >=7d post-apply
   afterSnapshotAt DateTime?
 
   // Impacto estimado (calculado al aplicar, heurístico)
-  estimatedImpactUsd  Float?                              // +$ ganado o -$ ahorrado en COP
-  estimatedImpactKind String?                             // 'savings' | 'revenue' | 'margin' | 'retention'
-  estimatedRationale  String?                             // Explicación en español de cómo se calculó
+  estimatedImpactUsd  Float? // +$ ganado o -$ ahorrado en COP
+  estimatedImpactKind String? // 'savings' | 'revenue' | 'margin' | 'retention'
+  estimatedRationale  String? // Explicación en español de cómo se calculó
 
   // Impacto realizado (opcional — si hay datos reales post-apply)
-  realizedImpactUsd   Float?
+  realizedImpactUsd    Float?
   realizedCalculatedAt DateTime?
 
   // V25 — Revert 1-clic
-  revertedAt      DateTime?
-  revertSideEffect String?                                 // Descripción del revert ejecutado
-  revertedBy      String?                                  // userId que disparó el revert (default self)
+  revertedAt       DateTime?
+  revertSideEffect String? // Descripción del revert ejecutado
+  revertedBy       String? // userId que disparó el revert (default self)
 
-  appliedAt       DateTime            @default(now())
-  createdAt       DateTime            @default(now())
+  appliedAt DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId, appliedAt])
   @@index([userId, source])
@@ -1077,15 +1082,15 @@ model AppliedAction {
 // debugging + métricas para el admin.
 
 enum BotName {
-  STOCK_BOT        // Alerta stock bajo por producto
-  RESTOCK_BOT      // Notifica pedidos de reposición a admin
-  ADS_BOT          // Monitorea ROAS/CPA y dispara recs
-  INACTIVITY_BOT   // Reactiva dropshippers dormidos
-  ONBOARDING_BOT   // Guía primeros 7 días del nuevo user
-  SEO_BOT          // Genera meta tags automáticos (future)
-  CONTENT_BOT      // Sugiere posts semanales (future)
-  FULFILLMENT_BOT  // Sync tracking Dropi (future)
-  PRECIO_BOT       // Ajusta precios sugeridos (future)
+  STOCK_BOT // Alerta stock bajo por producto
+  RESTOCK_BOT // Notifica pedidos de reposición a admin
+  ADS_BOT // Monitorea ROAS/CPA y dispara recs
+  INACTIVITY_BOT // Reactiva dropshippers dormidos
+  ONBOARDING_BOT // Guía primeros 7 días del nuevo user
+  SEO_BOT // Genera meta tags automáticos (future)
+  CONTENT_BOT // Sugiere posts semanales (future)
+  FULFILLMENT_BOT // Sync tracking Dropi (future)
+  PRECIO_BOT // Ajusta precios sugeridos (future)
   MORNING_BRIEF_BOT // V25 — Brief diario 8AM con top 3 acciones + KPI delta
 }
 
@@ -1093,28 +1098,28 @@ enum BotRunStatus {
   RUNNING
   SUCCESS
   FAILED
-  PARTIAL   // Algunos usuarios OK, otros con error
+  PARTIAL // Algunos usuarios OK, otros con error
 }
 
 model BotRun {
-  id            String       @id @default(cuid())
-  bot           BotName
-  status        BotRunStatus @default(RUNNING)
+  id     String       @id @default(cuid())
+  bot    BotName
+  status BotRunStatus @default(RUNNING)
 
-  startedAt     DateTime     @default(now())
-  finishedAt    DateTime?
-  durationMs    Int?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  durationMs Int?
 
   // Métricas de la corrida
-  usersProcessed Int         @default(0)
-  itemsAffected  Int         @default(0)
-  notifsCreated  Int         @default(0)
-  errors         Int         @default(0)
+  usersProcessed Int @default(0)
+  itemsAffected  Int @default(0)
+  notifsCreated  Int @default(0)
+  errors         Int @default(0)
 
   // Output estructurado para debugging
-  summary       String?
-  errorLog      Json?
-  triggeredBy   String?      @default("cron")  // 'cron' | 'manual' | userId
+  summary     String?
+  errorLog    Json?
+  triggeredBy String? @default("cron") // 'cron' | 'manual' | userId
 
   @@index([bot, startedAt])
   @@index([status, startedAt])
@@ -1130,24 +1135,24 @@ model BotRun {
 enum GoalStatus {
   ACTIVE
   ACHIEVED
-  MISSED        // Mes cerrado sin alcanzar
+  MISSED // Mes cerrado sin alcanzar
   ARCHIVED
 }
 
 model UserGoal {
-  id             String     @id @default(cuid())
-  userId         String
-  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Ventana mensual (primer día del mes en UTC)
-  year           Int
-  month          Int                          // 1-12
+  year  Int
+  month Int // 1-12
 
   // Metas
-  targetRevenue  Float                         // COP
-  targetOrders   Int?                          // opcional
-  targetMargin   Float?                        // % opcional
-  stretchRevenue Float?                        // meta "estiramiento"
+  targetRevenue  Float // COP
+  targetOrders   Int? // opcional
+  targetMargin   Float? // % opcional
+  stretchRevenue Float? // meta "estiramiento"
 
   // Tracking del cierre (se llena al finalizar el mes)
   achievedRevenue Float?
@@ -1157,11 +1162,196 @@ model UserGoal {
   achievedAt      DateTime?
 
   // Celebración (para evitar re-disparar)
-  celebrationSent Boolean    @default(false)
+  celebrationSent Boolean @default(false)
 
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, year, month])
   @@index([userId, status])
+}
+
+// ─────────────────────────────────────────────────────────
+// V26 — CHAT UNIVERSAL IA (Orchestrator + Memoria + Escalación)
+// ─────────────────────────────────────────────────────────
+// Entrada unificada al sistema IA. El orchestrator clasifica la
+// intención, construye contexto (persona + P&G + memoria), llama
+// al LLM apropiado, y escala a humano si la confianza es baja.
+//
+// Los 9 agentes existentes (VITA, MentorFinanciero, BlueprintAnalyst,
+// CEOAdvisor, MarketingGenerator, CreativeCopyWriter, MediaBuyer,
+// CreativoMaker, OptimizadorTienda, SoporteIA) siguen funcionando
+// como páginas dedicadas — este sistema añade una capa de entrada
+// universal por chat + ruteo inteligente.
+
+enum ChatAgent {
+  VITA // Default / orquestador general
+  MENTOR_FINANCIERO
+  BLUEPRINT_ANALYST
+  CEO_ADVISOR
+  MEDIA_BUYER
+  CREATIVO_MAKER
+  OPTIMIZADOR_TIENDA
+  SOPORTE_IA
+  ESCALATE_HUMAN // Nunca responde, solo marca escalación
+}
+
+enum ChatChannel {
+  WEB
+  WHATSAPP
+  PUSH
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model ConversationThread {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentName ChatAgent   @default(VITA)
+  channel   ChatChannel @default(WEB)
+  title     String? // Generado desde el primer mensaje
+
+  // Escalación
+  escalatedToArea Area?
+  escalatedAt     DateTime?
+
+  // Resumen del thread (actualizado async post-cierre)
+  lastMessageAt DateTime @default(now())
+  messageCount  Int      @default(0)
+
+  messages          ConversationMessage[]
+  escalationTickets EscalationTicket[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, lastMessageAt])
+  @@index([userId, agentName])
+}
+
+model ConversationMessage {
+  id       String             @id @default(cuid())
+  threadId String
+  thread   ConversationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role     MessageRole
+  content  String
+
+  // Metadata del LLM (solo en ASSISTANT)
+  model      String? // gpt-4o-mini | cache | rules | human | escalation
+  confidence Float? // 0..1
+  costUsd    Float?
+  latencyMs  Int?
+  source     String? // llm | cache | rules | human
+
+  // Attachments multimodal (V27)
+  attachments Json? // [{ mediaUploadId, type }]
+
+  createdAt DateTime @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+enum MemoryKind {
+  PREFERENCE // Estilo de comunicación, horarios
+  FACT // Datos objetivos del negocio
+  GOAL // Metas explícitas del usuario
+  PAIN_POINT // Frustraciones recurrentes
+  SUCCESS // Algo que le funcionó
+  WARNING // Algo a evitar en su contexto
+}
+
+// Memoria estructurada del usuario. En V26 sin embeddings (búsqueda por kind
+// + fecha + importance). En V28 se agrega columna embedding vector(1536) para
+// recuperación semántica.
+model UserMemory {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind           MemoryKind
+  content        String // Max ~280 chars idealmente
+  importance     Float      @default(0.5) // 0..1 — decae con el tiempo
+  sourceThreadId String? // Thread origen (no FK para no bloquear cleanup)
+  expiresAt      DateTime? // Null = permanente
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([userId, kind])
+  @@index([userId, importance])
+  @@index([expiresAt])
+}
+
+enum EscalationStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum EscalationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// Ticket de escalación a humano. Cada thread puede generar múltiples
+// (aunque lo usual es 1). El humano lo toma desde /admin/escalations.
+model EscalationTicket {
+  id       String             @id @default(cuid())
+  userId   String
+  user     User               @relation("EscalationUser", fields: [userId], references: [id], onDelete: Cascade)
+  threadId String
+  thread   ConversationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  fromAgent ChatAgent
+  toArea    Area
+  priority  EscalationPriority @default(MEDIUM)
+  status    EscalationStatus   @default(OPEN)
+
+  reason        String // Por qué IA escaló
+  summary       String? // Resumen del thread generado por IA
+  draftResponse String? // Respuesta draft del LLM (low-confidence)
+
+  // Asignación + resolución
+  assignedTo  String?
+  assignee    User?     @relation("EscalationAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  assignedAt  DateTime?
+  resolvedAt  DateTime?
+  resolution  String? // Qué hizo el humano
+  replyToUser String? // Mensaje final enviado al usuario
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, priority])
+  @@index([toArea, status])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────
+// V26 — SEMANTIC CACHE (capa 1 — hash exacto con userId)
+// ─────────────────────────────────────────────────────────
+// En V26 solo usamos hash exacto por (userId, agentName, query normalizada)
+// — esto evita fugas entre usuarios y cachea respuestas idénticas.
+// En V28 se agregará columna embedding vector(1536) + match semántico >0.92.
+
+model SemanticCache {
+  id        String    @id @default(cuid())
+  queryHash String    @unique // sha256 de "userId:agentName:normalized"
+  userId    String? // Opcional — null = respuesta "canónica" compartible
+  agentName ChatAgent
+  query     String // Query original (para debugging)
+  response  String
+  hits      Int       @default(0)
+  lastHitAt DateTime  @default(now())
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([agentName, expiresAt])
+  @@index([userId])
 }

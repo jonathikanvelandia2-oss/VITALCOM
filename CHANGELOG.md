@@ -1,5 +1,66 @@
 # Vitalcom Platform — Changelog
 
+## [2.4.0] — 2026-04-21
+
+**V26 VITA Chat Universal IA — Orchestrator + Persona + P&G + Escalación.**
+
+Primer entregable del blueprint "Vitalcom IA V20+". Se implementa la F1 completa del plan: entrada unificada al sistema IA que clasifica intenciones, construye contexto rico (persona por tier + P&G realtime del usuario + memoria estructurada + mensajes recientes) y rutea al agente correcto. Si la confianza es baja o la urgencia alta, el sistema escala de forma invisible al equipo humano con resumen IA del contexto.
+
+Decisiones clave:
+- **Sin pgvector ni Claude todavía** — todo funciona con OpenAI + reglas. pgvector y Claude entran en F3 (V28).
+- **Clasificador híbrido por keywords/regex** en lugar de embeddings — 0 latencia, 0 costo, determinista. ~45 reglas cubren los 9 agentes.
+- **Cache exacto con userId** — cero fuga de datos entre dropshippers. Respuestas con cifras personales se filtran y no se cachean.
+- **Circuit breaker** en el LLM router: si OpenAI falla 5 veces en 60s, responde con fallback de reglas por 5 min (protege factura).
+- **Sampling 0.3 en extractAndStoreFacts** — solo 30% de turnos llama LLM extra para memoria, ahorro 70% costos.
+- **Co-existencia con 9 agentes actuales**: el chat universal es una ENTRADA adicional, no reemplaza las páginas dedicadas (MediaBuyer, CreativoMaker, etc.).
+
+### V26 — Chat Universal + Orchestrator (`this release`)
+
+**Schema Prisma (6 modelos nuevos + 4 enums):**
+- `ConversationThread` + `ConversationMessage` — storage conversaciones IA con agente, confianza, costo, latencia, source (llm/cache/rules/human)
+- `UserMemory` con kinds PREFERENCE/FACT/GOAL/PAIN_POINT/SUCCESS/WARNING + importance con decay
+- `EscalationTicket` + enums EscalationStatus/Priority — tracking del ticket + asignación + resolución
+- `SemanticCache` con hash(userId+agent+query) para cache exacto
+- Enum `ChatAgent` (9 agentes) + `ChatChannel` + `MessageRole`
+
+**Librerías nuevas (`src/lib/ai/`):**
+- `llm-router.ts` — OpenAI singleton con fallback a rules, circuit breaker 5-fails/60s
+- `intent-classifier.ts` — 45+ reglas regex mapeando a los 9 agentes, con boost de urgencia
+- `pg-realtime.ts` — snapshot financiero en tiempo real desde FinanceEntry + AdSpendEntry, con break-even ROAS auto-calculado + 5 tipos de alertas
+- `persona.ts` — tiering rookie/learner/operator/expert/master basado en órdenes/días activo/margen, infiere estilo de comunicación de mensajes pasados
+- `semantic-cache.ts` — capa 1 hash exacto con userId, TTL variable por agente (10min MentorFinanciero vs 24h SoporteIA), rechaza cachear respuestas con $ o números personales
+- `user-memory.ts` — corta (últimos 10 msgs) + estructurada (UserMemory rows) + extracción automática sampling 0.3 + decay diario -0.02
+- `escalate.ts` — detección de área por keywords, resumen IA del thread, notificación a área vía bell, resolveTicket inyecta respuesta al chat
+- `orchestrator.ts` — pipeline completo: persona + clasificación → cache lookup → construir contexto → LLM → escalación por baja confianza → save + cache + extract async
+
+**APIs:**
+- `POST /api/ai/chat` — entrada única con `{ message, threadId?, forceAgent? }`
+- `GET /api/ai/chat/threads` — lista threads del usuario
+- `GET /api/ai/chat/threads/[id]` — detalle con mensajes
+- `GET /api/admin/escalations` + `GET /api/admin/escalations/[id]` — inbox del equipo
+- `POST /api/admin/escalations/[id]/resolve` — cerrar ticket + respuesta opcional al usuario
+
+**Hooks React Query:**
+- `useChatThreads` / `useChatThread` / `useSendChat` con invalidación dual
+- `useAdminEscalations` (refetch 30s) / `useAdminEscalation` / `useResolveEscalation`
+
+**UI:**
+- `/vita` — chat universal: hero + columna threads + área mensajes + 7 chips de forzado de agente (Auto/Finanzas/Ads/Creativo/Tienda/Blueprint/Soporte) + input con indicadores de source (cache/rules/escalation)
+- `/admin/escalations` — panel de tickets con filtros por status y área, stats cards, timeline del thread en panel lateral, pre-llenado de draftResponse en textarea de respuesta
+
+**Integración:**
+- Sidebar comunidad: VITA Chat (Sparkles + NEW) como primer link de "Tu negocio"
+- Sidebar admin: Escalaciones IA (ShieldAlert + NEW) bajo Bots autónomos
+- Bots y agentes existentes intactos — V26 se suma sin breaking changes
+
+**Pendiente para V27 (F2) y V28 (F3):**
+- V27: multimodal (Whisper + Vision con dedup), migrar 6 bots actuales a clase AutonomousBot + RLHF, 3 bots faltantes (Fulfillment/SEO/Content)
+- V28: pgvector en Supabase, cache semántico capa 2, memoria larga semántica, activar Claude Haiku via router para razonamiento
+
+Diferenciador: Vitalcom es la **única plataforma LATAM** con un orquestador IA que clasifica, personaliza por tier, inyecta P&G real y escala a humano de forma invisible al usuario — todo en un solo chat.
+
+---
+
 ## [2.3.0] — 2026-04-21
 
 **V25 Morning Brief + Historial de acciones con Revert 1-clic.**

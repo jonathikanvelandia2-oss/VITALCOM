@@ -46,8 +46,9 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Tu negocio',
     items: [
+      { href: '/vita', label: 'VITA Chat', icon: Sparkles, badge: 'NEW' },
       { href: '/comando', label: 'Command Center', icon: Command },
-      { href: '/brief', label: 'Morning Brief', icon: Sun, badge: 'NEW' },
+      { href: '/brief', label: 'Morning Brief', icon: Sun },
       { href: '/impacto', label: 'Impacto IA', icon: LineChart },
       { href: '/historial', label: 'Historial IA', icon: History, badge: 'NEW' },
       { href: '/metas', label: 'Mi Meta', icon: Target },
