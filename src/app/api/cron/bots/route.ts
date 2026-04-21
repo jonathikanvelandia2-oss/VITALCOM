@@ -5,6 +5,7 @@ import { runRestockBot } from '@/lib/bots/restock-bot'
 import { runAdsBot } from '@/lib/bots/ads-bot'
 import { runInactivityBot } from '@/lib/bots/inactivity-bot'
 import { runOnboardingBot } from '@/lib/bots/onboarding-bot'
+import { runMorningBriefBot } from '@/lib/bots/morning-brief-bot'
 import type { BotName } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -20,6 +21,7 @@ const BOT_MAP: Record<string, () => Promise<any>> = {
   ADS_BOT: runAdsBot,
   INACTIVITY_BOT: runInactivityBot,
   ONBOARDING_BOT: runOnboardingBot,
+  MORNING_BRIEF_BOT: runMorningBriefBot,
 }
 
 function isAuthorized(req: Request): boolean {
@@ -44,7 +46,7 @@ async function handle(req: Request) {
   const botParam = url.searchParams.get('bot') as BotName | 'ALL' | null
   const target: Array<BotName> = botParam && botParam !== 'ALL'
     ? [botParam as BotName]
-    : ['STOCK_BOT', 'ONBOARDING_BOT', 'INACTIVITY_BOT', 'ADS_BOT', 'RESTOCK_BOT']
+    : ['STOCK_BOT', 'ONBOARDING_BOT', 'INACTIVITY_BOT', 'ADS_BOT', 'RESTOCK_BOT', 'MORNING_BRIEF_BOT']
 
   const results = []
   for (const bot of target) {

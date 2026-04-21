@@ -1,5 +1,51 @@
 # Vitalcom Platform — Changelog
 
+## [2.3.0] — 2026-04-21
+
+**V25 Morning Brief + Historial de acciones con Revert 1-clic.**
+
+Cierra M4 y M5 del plan de mejoras CEO. El dropshipper entra cada mañana y sabe qué hacer en 30 segundos — más la tranquilidad de poder deshacer cualquier acción IA si no funcionó.
+
+### V25 — Morning Brief + Historial con Revert (`this release`)
+
+**M4 — Morning Brief (hábito 8AM):**
+- Helper `generateMorningBrief` que agrega top 3 acciones cross-agente (priority ≥70), KPI delta hoy vs ayer + semana vs semana anterior, progreso de meta mensual, y frase motivacional determinística por día
+- Bot `MorningBriefBot` corre 13:00 UTC (~8AM COL/EC) · dedup 20h por usuario · skip users sin data
+- Enum `NotificationType.MORNING_BRIEF` · icon Sun en bell
+- `GET /api/ai/morning-brief` on-demand + hook `useMorningBrief` (refetch 15min)
+- UI `/brief`:
+  - Hero con greeting personalizado + summary auto-generada
+  - 4 KPI cards: ingreso hoy, pedidos, gasto ads, revenue 7d — con delta vs periodo anterior
+  - Top 3 acciones con color por fuente + priority + linkea al agente
+  - Card meta mensual con progress bar + CTA si no hay meta
+  - Card motivacional del día
+  - 3 cross-links (Command Center / Impacto / Historial)
+
+**M5 — Historial de acciones con Revert:**
+- Campos nuevos `AppliedAction.revertedAt | revertSideEffect | revertedBy`
+- Helper `revertAppliedAction(action)` con lógica específica por tipo:
+  - MEDIA_BUYER: PAUSE_CAMPAIGN ↔ RESTART_CAMPAIGN
+  - STORE_OPTIMIZER: PRICING/MARGIN (restaura precioPublico), HIGHLIGHT (quita bestseller), REMOVE (reactiva productSync)
+  - Otros tipos: solo marca revertedAt (sin side-effect server)
+- Cuando se revierte, la CampaignRecommendation/StoreOptimization original vuelve a DISMISSED para evitar confusión
+- 2 APIs: `GET /api/ai/history` (filtros source/status/days + summary) · `POST /api/ai/history/[id]/revert`
+- Hook `useActionHistory` + `useRevertAction` con invalidación de command-center + impact
+- UI `/historial`:
+  - 3 stat cards (total, activas, revertidas)
+  - Filtros por status y source
+  - Timeline con cards que muestran fuente + tipo + badge estado + producto/campaña + rationale + impacto estimado/realizado
+  - Botón REVERTIR con modal de confirmación + side-effect resultante en alert
+
+**Integración:**
+- Command Center `/comando` con 2 banners nuevos (Morning Brief + Historial) arriba del banner Impacto
+- Sidebar "Tu negocio": Morning Brief (Sun) + Historial IA (History) con badge NEW
+- `vercel.json` con 6to cron schedule (MORNING_BRIEF_BOT daily 13:00 UTC)
+- Dispatcher `/api/cron/bots` reconoce MORNING_BRIEF_BOT
+
+Diferenciador: Vitalcom es la única plataforma dropshipping que garantiza **reversibilidad total** de las acciones IA. Cero lock-in · trust-by-design.
+
+---
+
 ## [2.2.0] — 2026-04-21
 
 **V24 Metas mensuales + Benchmarks anónimos de la comunidad.**

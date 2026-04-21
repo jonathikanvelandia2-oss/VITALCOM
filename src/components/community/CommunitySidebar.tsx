@@ -32,6 +32,8 @@ import {
   Command,
   LineChart,
   LifeBuoy,
+  Sun,
+  History,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 
@@ -45,8 +47,10 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Tu negocio',
     items: [
       { href: '/comando', label: 'Command Center', icon: Command },
+      { href: '/brief', label: 'Morning Brief', icon: Sun, badge: 'NEW' },
       { href: '/impacto', label: 'Impacto IA', icon: LineChart },
-      { href: '/metas', label: 'Mi Meta', icon: Target, badge: 'NEW' },
+      { href: '/historial', label: 'Historial IA', icon: History, badge: 'NEW' },
+      { href: '/metas', label: 'Mi Meta', icon: Target },
       { href: '/soporte', label: 'SoporteIA', icon: LifeBuoy },
       { href: '/mi-tienda', label: 'Mi Tienda', icon: ShoppingBag, badge: '3' },
       { href: '/pedidos', label: 'Mis Pedidos', icon: ShoppingCart },

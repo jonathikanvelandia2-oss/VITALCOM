@@ -671,6 +671,7 @@ enum NotificationType {
   COMMUNITY_DM      // Mensaje directo 1:1 en comunidad
   STORE_CONNECTED   // Tienda Shopify conectada
   AI_ACTION         // V20 — Acción IA crítica del Command Center
+  MORNING_BRIEF     // V25 — Brief diario del día (8AM con top 3 + KPIs)
   SYSTEM            // Anuncios de plataforma
 }
 
@@ -1055,11 +1056,17 @@ model AppliedAction {
   realizedImpactUsd   Float?
   realizedCalculatedAt DateTime?
 
+  // V25 — Revert 1-clic
+  revertedAt      DateTime?
+  revertSideEffect String?                                 // Descripción del revert ejecutado
+  revertedBy      String?                                  // userId que disparó el revert (default self)
+
   appliedAt       DateTime            @default(now())
   createdAt       DateTime            @default(now())
 
   @@index([userId, appliedAt])
   @@index([userId, source])
+  @@index([userId, revertedAt])
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1079,6 +1086,7 @@ enum BotName {
   CONTENT_BOT      // Sugiere posts semanales (future)
   FULFILLMENT_BOT  // Sync tracking Dropi (future)
   PRECIO_BOT       // Ajusta precios sugeridos (future)
+  MORNING_BRIEF_BOT // V25 — Brief diario 8AM con top 3 acciones + KPI delta
 }
 
 enum BotRunStatus {

@@ -288,6 +288,70 @@ export default function CommandCenterPage() {
           </Link>
         )}
 
+        {/* V25 — Banners Morning Brief + Historial */}
+        <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Link
+            href="/brief"
+            className="flex items-center justify-between rounded-xl px-4 py-3 transition-all hover:translate-x-0.5"
+            style={{
+              background:
+                'linear-gradient(90deg, rgba(255,184,0,0.1), rgba(198,255,60,0.06))',
+              border: '1px solid rgba(255,184,0,0.3)',
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-lg"
+                style={{ background: 'linear-gradient(135deg, #FFB800, var(--vc-lime-main))' }}
+              >
+                <Sparkles size={16} style={{ color: 'var(--vc-black)' }} />
+              </div>
+              <div>
+                <p
+                  className="text-[11px] font-bold uppercase tracking-wider"
+                  style={{ color: '#FFB800', fontFamily: 'var(--font-mono)' }}
+                >
+                  Morning Brief (V25)
+                </p>
+                <p className="text-[13px]" style={{ color: 'var(--vc-white-soft)' }}>
+                  Resumen diario 8AM — top 3 + KPIs vs ayer
+                </p>
+              </div>
+            </div>
+            <ArrowRight size={16} style={{ color: 'var(--vc-lime-main)' }} />
+          </Link>
+          <Link
+            href="/historial"
+            className="flex items-center justify-between rounded-xl px-4 py-3 transition-all hover:translate-x-0.5"
+            style={{
+              background:
+                'linear-gradient(90deg, rgba(60,198,255,0.08), rgba(255,71,87,0.06))',
+              border: '1px solid rgba(60,198,255,0.3)',
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-9 w-9 items-center justify-center rounded-lg"
+                style={{ background: 'linear-gradient(135deg, #3CC6FF, #A855F7)' }}
+              >
+                <CheckCircle2 size={16} style={{ color: 'var(--vc-black)' }} />
+              </div>
+              <div>
+                <p
+                  className="text-[11px] font-bold uppercase tracking-wider"
+                  style={{ color: '#3CC6FF', fontFamily: 'var(--font-mono)' }}
+                >
+                  Historial IA (V25)
+                </p>
+                <p className="text-[13px]" style={{ color: 'var(--vc-white-soft)' }}>
+                  Toda acción aplicada — con revert 1-clic
+                </p>
+              </div>
+            </div>
+            <ArrowRight size={16} style={{ color: 'var(--vc-lime-main)' }} />
+          </Link>
+        </div>
+
         {/* Banner cross-link a Impacto IA */}
         <Link
           href="/impacto"

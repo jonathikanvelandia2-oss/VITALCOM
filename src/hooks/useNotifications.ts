@@ -8,7 +8,7 @@ export type Notification = {
   id: string
   type: 'ORDER_STATUS' | 'ORDER_NEW' | 'INBOX_MESSAGE' | 'INBOX_ASSIGNED' |
         'COMMUNITY_LIKE' | 'COMMUNITY_REPLY' | 'COMMUNITY_DM' | 'STORE_CONNECTED' |
-        'AI_ACTION' | 'SYSTEM'
+        'AI_ACTION' | 'MORNING_BRIEF' | 'SYSTEM'
   title: string
   body: string | null
   link: string | null

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import {
-  Bell, Package, MessageSquare, Store, Heart, AtSign, AlertCircle, CheckCheck, Sparkles,
+  Bell, Package, MessageSquare, Store, Heart, AtSign, AlertCircle, CheckCheck, Sparkles, Sun,
 } from 'lucide-react'
 import {
   useNotifications, useMarkNotificationRead, useMarkAllRead, useSyncAiCritical,
@@ -24,6 +24,7 @@ const ICONS: Record<Notification['type'], typeof Bell> = {
   COMMUNITY_DM: MessageSquare,
   STORE_CONNECTED: Store,
   AI_ACTION: Sparkles,
+  MORNING_BRIEF: Sun,
   SYSTEM: AlertCircle,
 }
 
