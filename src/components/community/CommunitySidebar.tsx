@@ -31,6 +31,7 @@ import {
   Wand2,
   Command,
   LineChart,
+  LifeBuoy,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 
@@ -44,7 +45,8 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Tu negocio',
     items: [
       { href: '/comando', label: 'Command Center', icon: Command },
-      { href: '/impacto', label: 'Impacto IA', icon: LineChart, badge: 'NEW' },
+      { href: '/impacto', label: 'Impacto IA', icon: LineChart },
+      { href: '/soporte', label: 'SoporteIA', icon: LifeBuoy, badge: 'NEW' },
       { href: '/mi-tienda', label: 'Mi Tienda', icon: ShoppingBag, badge: '3' },
       { href: '/pedidos', label: 'Mis Pedidos', icon: ShoppingCart },
       { href: '/mi-pyg', label: 'Mi P&G', icon: Wallet },

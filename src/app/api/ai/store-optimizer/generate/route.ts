@@ -2,6 +2,11 @@ import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { generateOptimizations } from '@/lib/ai/agents/store-optimizer'
+import {
+  expireStaleStoreOptimizer,
+  seenStoreOptimizerKeys,
+  STORE_OPTIMIZER_EXPIRY_MS,
+} from '@/lib/ai/recommendation-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,21 +17,14 @@ export const dynamic = 'force-dynamic'
 export const POST = withErrorHandler(async () => {
   const session = await requireSession()
 
-  const { optimizations } = await generateOptimizations(session.id)
+  const [{ optimizations }] = await Promise.all([
+    generateOptimizations(session.id),
+    expireStaleStoreOptimizer(session.id),
+  ])
 
-  // Expira viejas antes de crear nuevas
-  await prisma.storeOptimization.updateMany({
-    where: { userId: session.id, status: 'PENDING', expiresAt: { lt: new Date() } },
-    data: { status: 'EXPIRED' },
-  })
+  const seen = await seenStoreOptimizerKeys(session.id)
 
-  const existing = await prisma.storeOptimization.findMany({
-    where: { userId: session.id, status: 'PENDING' },
-    select: { type: true, productId: true },
-  })
-  const seen = new Set(existing.map((e) => `${e.type}:${e.productId ?? 'none'}`))
-
-  const expiresAt = new Date(Date.now() + 14 * 24 * 3600 * 1000)
+  const expiresAt = new Date(Date.now() + STORE_OPTIMIZER_EXPIRY_MS)
   const toCreate = optimizations.filter((r) => !seen.has(`${r.type}:${r.productId ?? 'none'}`))
 
   if (toCreate.length > 0) {

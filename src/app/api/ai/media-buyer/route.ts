@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
+import { expireStaleMediaBuyer } from '@/lib/ai/recommendation-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,15 +14,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   const url = new URL(req.url)
   const includeHistory = url.searchParams.get('history') === 'true'
 
-  // Expira las vencidas on-the-fly
-  await prisma.campaignRecommendation.updateMany({
-    where: {
-      userId: session.id,
-      status: 'PENDING',
-      expiresAt: { lt: new Date() },
-    },
-    data: { status: 'EXPIRED' },
-  })
+  await expireStaleMediaBuyer(session.id)
 
   const recs = await prisma.campaignRecommendation.findMany({
     where: {

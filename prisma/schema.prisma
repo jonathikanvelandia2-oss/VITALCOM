@@ -240,6 +240,10 @@ model Order {
 
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([status, createdAt])
 }
 
 model OrderItem {
@@ -251,6 +255,9 @@ model OrderItem {
   quantity  Int
   unitPrice Float
   total     Float
+
+  @@index([productId])
+  @@index([orderId])
 }
 
 // ─────────────────────────────────────────────────────────

@@ -1,6 +1,10 @@
 import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
+import {
+  expireStaleMediaBuyer,
+  expireStaleStoreOptimizer,
+} from '@/lib/ai/recommendation-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,16 +38,7 @@ export const GET = withErrorHandler(async () => {
   const userId = session.id
 
   // Expira vencidas en paralelo
-  await Promise.all([
-    prisma.campaignRecommendation.updateMany({
-      where: { userId, status: 'PENDING', expiresAt: { lt: new Date() } },
-      data: { status: 'EXPIRED' },
-    }),
-    prisma.storeOptimization.updateMany({
-      where: { userId, status: 'PENDING', expiresAt: { lt: new Date() } },
-      data: { status: 'EXPIRED' },
-    }),
-  ])
+  await Promise.all([expireStaleMediaBuyer(userId), expireStaleStoreOptimizer(userId)])
 
   const from30 = new Date(Date.now() - 30 * 86400000)
 

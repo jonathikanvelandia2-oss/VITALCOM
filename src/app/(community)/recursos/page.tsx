@@ -49,7 +49,7 @@ export default function RecursosPage() {
   const { data, isLoading } = useResources()
   const trackDownload = useTrackDownload()
 
-  const resources = (data?.resources ?? []) as ApiResource[]
+  const resources = useMemo(() => (data?.resources ?? []) as ApiResource[], [data])
 
   const filtered = useMemo(() => {
     return resources.filter((r) => {
@@ -172,6 +172,7 @@ function ResourceRow({ resource, onOpen }: { resource: ApiResource; onOpen: () =
   return (
     <div className="vc-card flex items-center gap-4">
       {resource.thumbnail ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={resource.thumbnail}
           alt={resource.title}

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
+import { expireStaleStoreOptimizer } from '@/lib/ai/recommendation-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,14 +15,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   const includeHistory = url.searchParams.get('history') === 'true'
   const type = url.searchParams.get('type')
 
-  await prisma.storeOptimization.updateMany({
-    where: {
-      userId: session.id,
-      status: 'PENDING',
-      expiresAt: { lt: new Date() },
-    },
-    data: { status: 'EXPIRED' },
-  })
+  await expireStaleStoreOptimizer(session.id)
 
   const where: Record<string, unknown> = { userId: session.id }
   if (!includeHistory) where.status = 'PENDING'

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { Plus, Search, Package, Pencil, Trash2, X, Loader2, Camera, ImageOff, UploadCloud } from 'lucide-react'
 import { AdminTopbar } from '@/components/admin/AdminTopbar'
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '@/hooks/useProducts'
@@ -192,7 +192,7 @@ function ImageUploadPanel({ product, onClose }: { product: any; onClose: () => v
   const [uploadError, setUploadError] = useState('')
 
   // Imágenes actuales del producto
-  const images: string[] = product.images ?? []
+  const images = useMemo<string[]>(() => product.images ?? [], [product.images])
 
   // Subir archivo al endpoint /api/upload y luego actualizar imágenes del producto
   const uploadFile = useCallback(async (file: File) => {

@@ -177,6 +177,41 @@ export default function CommandCenterPage() {
       </div>
 
       <div className="mx-auto max-w-7xl px-6 py-6">
+        {/* Banner cross-link a Impacto IA */}
+        <Link
+          href="/impacto"
+          className="mb-6 flex items-center justify-between rounded-xl px-4 py-3 transition-all hover:translate-x-0.5"
+          style={{
+            background:
+              'linear-gradient(90deg, rgba(198,255,60,0.08), rgba(168,85,247,0.08))',
+            border: '1px solid rgba(198,255,60,0.25)',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-lg"
+              style={{ background: 'var(--vc-gradient-primary)' }}
+            >
+              <TrendingUp size={16} style={{ color: 'var(--vc-black)' }} />
+            </div>
+            <div>
+              <p
+                className="text-[11px] font-bold uppercase tracking-wider"
+                style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}
+              >
+                Impacto IA (V21)
+              </p>
+              <p
+                className="text-[13px]"
+                style={{ color: 'var(--vc-white-soft)' }}
+              >
+                Mira cuánto dinero te han ahorrado y generado tus acciones aplicadas
+              </p>
+            </div>
+          </div>
+          <ArrowRight size={16} style={{ color: 'var(--vc-lime-main)' }} />
+        </Link>
+
         {/* KPIs de negocio */}
         <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
           <KpiCard

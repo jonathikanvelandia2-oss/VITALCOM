@@ -36,7 +36,7 @@ export default function CourseDetailPage({ params }: { params: Promise<{ id: str
   const [feedback, setFeedback] = useState<{ points: number; levelUp: boolean; completed: boolean } | null>(null)
 
   const course = data?.course
-  const modules: Module[] = course?.modules ?? []
+  const modules = useMemo<Module[]>(() => course?.modules ?? [], [course])
   const completed = useMemo<string[]>(() => data?.progress?.completedLessons ?? [], [data])
   const percentage = data?.progress?.percentage ?? 0
   const totalLessons = data?.progress?.totalLessons ?? 0

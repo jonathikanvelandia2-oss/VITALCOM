@@ -466,6 +466,7 @@ function NewChatModal({ onClose, onStart }: { onClose: () => void; onStart: (id:
 function Avatar({ name, avatar, size }: { name: string; avatar: string | null; size: number }) {
   if (avatar) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={avatar}
         alt={name}

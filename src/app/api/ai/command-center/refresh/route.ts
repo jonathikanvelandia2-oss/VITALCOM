@@ -4,115 +4,100 @@ import { requireSession } from '@/lib/auth/session'
 import { generateRecommendations } from '@/lib/ai/agents/media-buyer'
 import { generateOptimizations } from '@/lib/ai/agents/store-optimizer'
 import { syncCriticalToNotifications } from '@/lib/ai/notify-critical'
+import {
+  expireStaleMediaBuyer,
+  expireStaleStoreOptimizer,
+  seenMediaBuyerKeys,
+  seenStoreOptimizerKeys,
+  MEDIA_BUYER_EXPIRY_MS,
+  STORE_OPTIMIZER_EXPIRY_MS,
+} from '@/lib/ai/recommendation-helpers'
 
 export const dynamic = 'force-dynamic'
 
 // ── POST /api/ai/command-center/refresh ──────────────────
-// Dispara los 3 agentes IA en paralelo y persiste las nuevas
-// recomendaciones deduplicadas. Un solo botón → todo fresco.
+// Dispara los 2 agentes IA accionables en paralelo + expira
+// vencidas + dedup + sync de críticas al bell. Un solo botón → todo fresco.
 
 export const POST = withErrorHandler(async () => {
   const session = await requireSession()
+  const userId = session.id
 
-  // Expira viejas
-  await Promise.all([
-    prisma.campaignRecommendation.updateMany({
-      where: { userId: session.id, status: 'PENDING', expiresAt: { lt: new Date() } },
-      data: { status: 'EXPIRED' },
-    }),
-    prisma.storeOptimization.updateMany({
-      where: { userId: session.id, status: 'PENDING', expiresAt: { lt: new Date() } },
-      data: { status: 'EXPIRED' },
-    }),
+  // Paraleliza todo lo que puede correr sin depender del anterior:
+  // expira vencidas + genera nuevas + obtiene keys de dedup
+  const [mbRes, soRes, mbSeen, soSeen] = await Promise.all([
+    generateRecommendations(userId, 7),
+    generateOptimizations(userId),
+    expireStaleMediaBuyer(userId).then(() => seenMediaBuyerKeys(userId)),
+    expireStaleStoreOptimizer(userId).then(() => seenStoreOptimizerKeys(userId)),
   ])
 
-  const [mbRes, soRes] = await Promise.all([
-    generateRecommendations(session.id, 7),
-    generateOptimizations(session.id),
-  ])
+  const mbExpiresAt = new Date(Date.now() + MEDIA_BUYER_EXPIRY_MS)
+  const soExpiresAt = new Date(Date.now() + STORE_OPTIMIZER_EXPIRY_MS)
 
-  // MediaBuyer dedup + persist
-  const mbExisting = await prisma.campaignRecommendation.findMany({
-    where: { userId: session.id, status: 'PENDING' },
-    select: { type: true, campaignId: true },
-  })
-  const mbSeen = new Set(mbExisting.map((e) => `${e.type}:${e.campaignId ?? 'none'}`))
-  const mbExpiresAt = new Date(Date.now() + 72 * 3600 * 1000)
   const mbToCreate = mbRes.recommendations.filter(
     (r) => !mbSeen.has(`${r.type}:${r.campaignId ?? 'none'}`),
   )
-
-  if (mbToCreate.length > 0) {
-    await prisma.campaignRecommendation.createMany({
-      data: mbToCreate.map((r) => ({
-        userId: session.id,
-        campaignId: r.campaignId,
-        accountId: r.accountId,
-        type: r.type,
-        title: r.title,
-        reasoning: r.reasoning,
-        actionLabel: r.actionLabel,
-        suggestedValue: r.suggestedValue,
-        priority: r.priority,
-        confidence: r.confidence,
-        roas: r.metrics.roas,
-        spend: r.metrics.spend,
-        revenue: r.metrics.revenue,
-        clicks: r.metrics.clicks,
-        conversions: r.metrics.conversions,
-        impressions: r.metrics.impressions,
-        expiresAt: mbExpiresAt,
-      })),
-    })
-  }
-
-  // OptimizadorTienda dedup + persist
-  const soExisting = await prisma.storeOptimization.findMany({
-    where: { userId: session.id, status: 'PENDING' },
-    select: { type: true, productId: true },
-  })
-  const soSeen = new Set(soExisting.map((e) => `${e.type}:${e.productId ?? 'none'}`))
-  const soExpiresAt = new Date(Date.now() + 14 * 24 * 3600 * 1000)
   const soToCreate = soRes.optimizations.filter(
     (r) => !soSeen.has(`${r.type}:${r.productId ?? 'none'}`),
   )
 
-  if (soToCreate.length > 0) {
-    await prisma.storeOptimization.createMany({
-      data: soToCreate.map((r) => ({
-        userId: session.id,
-        productId: r.productId,
-        type: r.type,
-        title: r.title,
-        reasoning: r.reasoning,
-        actionLabel: r.actionLabel,
-        suggestedValue: r.suggestedValue,
-        suggestedText: r.suggestedText,
-        suggestedData: r.suggestedData as any,
-        priority: r.priority,
-        confidence: r.confidence,
-        salesLast30: r.metrics.salesLast30,
-        revenueLast30: r.metrics.revenueLast30,
-        marginPct: r.metrics.marginPct,
-        stockLevel: r.metrics.stockLevel,
-        conversionRate: r.metrics.conversionRate,
-        expiresAt: soExpiresAt,
-      })),
-    })
-  }
+  // Inserts en paralelo también
+  await Promise.all([
+    mbToCreate.length > 0
+      ? prisma.campaignRecommendation.createMany({
+          data: mbToCreate.map((r) => ({
+            userId,
+            campaignId: r.campaignId,
+            accountId: r.accountId,
+            type: r.type,
+            title: r.title,
+            reasoning: r.reasoning,
+            actionLabel: r.actionLabel,
+            suggestedValue: r.suggestedValue,
+            priority: r.priority,
+            confidence: r.confidence,
+            roas: r.metrics.roas,
+            spend: r.metrics.spend,
+            revenue: r.metrics.revenue,
+            clicks: r.metrics.clicks,
+            conversions: r.metrics.conversions,
+            impressions: r.metrics.impressions,
+            expiresAt: mbExpiresAt,
+          })),
+        })
+      : Promise.resolve(),
+    soToCreate.length > 0
+      ? prisma.storeOptimization.createMany({
+          data: soToCreate.map((r) => ({
+            userId,
+            productId: r.productId,
+            type: r.type,
+            title: r.title,
+            reasoning: r.reasoning,
+            actionLabel: r.actionLabel,
+            suggestedValue: r.suggestedValue,
+            suggestedText: r.suggestedText,
+            suggestedData: r.suggestedData as any,
+            priority: r.priority,
+            confidence: r.confidence,
+            salesLast30: r.metrics.salesLast30,
+            revenueLast30: r.metrics.revenueLast30,
+            marginPct: r.metrics.marginPct,
+            stockLevel: r.metrics.stockLevel,
+            conversionRate: r.metrics.conversionRate,
+            expiresAt: soExpiresAt,
+          })),
+        })
+      : Promise.resolve(),
+  ])
 
-  // V20 — sync críticas a bell de notificaciones
-  const notifSync = await syncCriticalToNotifications(session.id)
+  // V20 — sync críticas a bell (se ejecuta después porque necesita las nuevas)
+  const notifSync = await syncCriticalToNotifications(userId)
 
   return apiSuccess({
-    mediaBuyer: {
-      created: mbToCreate.length,
-      total: mbRes.recommendations.length,
-    },
-    storeOptimizer: {
-      created: soToCreate.length,
-      total: soRes.optimizations.length,
-    },
+    mediaBuyer: { created: mbToCreate.length, total: mbRes.recommendations.length },
+    storeOptimizer: { created: soToCreate.length, total: soRes.optimizations.length },
     notifications: notifSync,
     totalNew: mbToCreate.length + soToCreate.length,
   })

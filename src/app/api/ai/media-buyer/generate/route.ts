@@ -2,6 +2,11 @@ import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { generateRecommendations } from '@/lib/ai/agents/media-buyer'
+import {
+  expireStaleMediaBuyer,
+  seenMediaBuyerKeys,
+  MEDIA_BUYER_EXPIRY_MS,
+} from '@/lib/ai/recommendation-helpers'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,21 +19,14 @@ export const POST = withErrorHandler(async (req: Request) => {
   const url = new URL(req.url)
   const days = Math.min(Math.max(parseInt(url.searchParams.get('days') || '7'), 3), 30)
 
-  const { recommendations } = await generateRecommendations(session.id, days)
+  const [{ recommendations }] = await Promise.all([
+    generateRecommendations(session.id, days),
+    expireStaleMediaBuyer(session.id),
+  ])
 
-  // Expira viejas antes de crear nuevas
-  await prisma.campaignRecommendation.updateMany({
-    where: { userId: session.id, status: 'PENDING', expiresAt: { lt: new Date() } },
-    data: { status: 'EXPIRED' },
-  })
+  const seen = await seenMediaBuyerKeys(session.id)
 
-  const existing = await prisma.campaignRecommendation.findMany({
-    where: { userId: session.id, status: 'PENDING' },
-    select: { type: true, campaignId: true },
-  })
-  const seen = new Set(existing.map((e) => `${e.type}:${e.campaignId ?? 'none'}`))
-
-  const expiresAt = new Date(Date.now() + 72 * 3600 * 1000)
+  const expiresAt = new Date(Date.now() + MEDIA_BUYER_EXPIRY_MS)
   const toCreate = recommendations.filter((r) => !seen.has(`${r.type}:${r.campaignId ?? 'none'}`))
 
   if (toCreate.length > 0) {
