@@ -99,6 +99,23 @@ export function useDeleteWaTemplate() {
   })
 }
 
+// V30 — Sync con Meta Graph API
+export function useSyncMetaTemplates() {
+  const qc = useQueryClient()
+  return useMutation<
+    { synced: number; created: number; updated: number; mock: boolean },
+    Error,
+    string
+  >({
+    mutationFn: (accountId) => fetchJson('/api/whatsapp/templates/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId }),
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['wa-templates'] }),
+  })
+}
+
 // ── A/B stats ──
 export type AbStatsRow = {
   templateId: string

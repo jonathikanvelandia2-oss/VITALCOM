@@ -1,12 +1,12 @@
 'use client'
 
-import { use, useState, useEffect } from 'react'
+import { use, useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
-  ArrowLeft, Loader2, Save, TestTube, CheckCircle2, XCircle, Clock,
-  ChevronRight, Workflow as WorkflowIcon,
+  ArrowLeft, Loader2, Save, TestTube, Code2, Eye, Settings2,
 } from 'lucide-react'
 import { AdminTopbar } from '@/components/admin/AdminTopbar'
+import { WorkflowCanvas, WORKFLOW_STEP_META, type CanvasStep } from '@/components/admin/WorkflowCanvas'
 import { useWaWorkflow, useUpdateWaWorkflow, useTestWaWorkflow } from '@/hooks/useWaWorkflows'
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
@@ -16,21 +16,23 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
   CANCELLED: { label: 'Cancelada', color: '#8B9BA8' },
 }
 
+type Tab = 'visual' | 'json'
+
 export default function AdminWorkflowDetailPage(props: { params: Promise<{ id: string }> }) {
   const { id } = use(props.params)
   const workflowQ = useWaWorkflow(id)
   const updateM = useUpdateWaWorkflow()
   const testM = useTestWaWorkflow()
 
+  const [tab, setTab] = useState<Tab>('visual')
   const [stepsJson, setStepsJson] = useState('')
   const [triggerJson, setTriggerJson] = useState('')
   const [testPhone, setTestPhone] = useState('+573001234567')
   const [jsonError, setJsonError] = useState<string | null>(null)
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
 
   const workflow = workflowQ.data
 
-  // Cargar JSON inicial una vez que tenemos data. Usar workflow.id como key
-  // evita dependencias innecesarias que reescribirían el buffer del editor.
   useEffect(() => {
     if (workflow && !stepsJson) {
       setStepsJson(JSON.stringify(workflow.steps, null, 2))
@@ -38,6 +40,20 @@ export default function AdminWorkflowDetailPage(props: { params: Promise<{ id: s
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflow?.id])
+
+  // Parseo defensivo para la vista visual
+  let parsedSteps: CanvasStep[] = []
+  let parseError: string | null = null
+  try {
+    const p = stepsJson ? JSON.parse(stepsJson) : []
+    if (Array.isArray(p)) parsedSteps = p as CanvasStep[]
+  } catch (err) {
+    parseError = (err as Error).message
+  }
+
+  const selectedStep = selectedStepId
+    ? parsedSteps.find(s => s.id === selectedStepId) ?? null
+    : null
 
   const handleSave = async () => {
     setJsonError(null)
@@ -62,6 +78,39 @@ export default function AdminWorkflowDetailPage(props: { params: Promise<{ id: s
     alert(`Test iniciado. Execution ID: ${result.executionId}`)
   }
 
+  // Callbacks del canvas: persiste posiciones en el JSON del step
+  const handlePositionsChange = useCallback((positions: Record<string, { x: number; y: number }>) => {
+    const updated = parsedSteps.map(s => ({
+      ...s,
+      position: positions[s.id] ?? s.position,
+    }))
+    setStepsJson(JSON.stringify(updated, null, 2))
+  }, [parsedSteps])
+
+  const handleStepFieldChange = (field: 'id' | 'type' | 'nextOnSuccess' | 'nextOnFail', value: string) => {
+    if (!selectedStep) return
+    const updated = parsedSteps.map(s => {
+      if (s.id !== selectedStep.id) return s
+      return { ...s, [field]: value || undefined }
+    })
+    setStepsJson(JSON.stringify(updated, null, 2))
+    if (field === 'id' && value) setSelectedStepId(value)
+  }
+
+  const handleConfigChange = (configJson: string) => {
+    if (!selectedStep) return
+    try {
+      const parsedConfig = JSON.parse(configJson)
+      const updated = parsedSteps.map(s => {
+        if (s.id !== selectedStep.id) return s
+        return { ...s, config: parsedConfig }
+      })
+      setStepsJson(JSON.stringify(updated, null, 2))
+    } catch {
+      // Silencioso — el usuario aún está tipeando
+    }
+  }
+
   if (workflowQ.isLoading || !workflow) {
     return (
       <div className="min-h-screen bg-[var(--vc-black)]">
@@ -77,8 +126,8 @@ export default function AdminWorkflowDetailPage(props: { params: Promise<{ id: s
     <div className="min-h-screen bg-[var(--vc-black)]">
       <AdminTopbar title={workflow.name} subtitle={workflow.purpose} />
 
-      <div className="mx-auto max-w-5xl px-4 py-6 lg:px-6">
-        <div className="mb-4 flex items-center justify-between">
+      <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <Link
             href="/admin/workflows"
             className="flex items-center gap-1.5 rounded-md border border-[var(--vc-gray-dark)] bg-[var(--vc-black-mid)] px-2 py-1 text-xs text-[var(--vc-white-dim)] hover:border-[var(--vc-lime-main)]/30"
@@ -86,6 +135,33 @@ export default function AdminWorkflowDetailPage(props: { params: Promise<{ id: s
             <ArrowLeft className="h-3 w-3" />
             Volver a la lista
           </Link>
+
+          {/* Tab switcher */}
+          <div className="flex rounded-lg border border-[var(--vc-gray-dark)] bg-[var(--vc-black-mid)] p-0.5">
+            <button
+              onClick={() => setTab('visual')}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider transition ${
+                tab === 'visual'
+                  ? 'bg-[var(--vc-lime-main)] text-[var(--vc-black)]'
+                  : 'text-[var(--vc-white-dim)] hover:text-[var(--vc-lime-main)]'
+              }`}
+            >
+              <Eye className="h-3 w-3" />
+              Visual
+            </button>
+            <button
+              onClick={() => setTab('json')}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider transition ${
+                tab === 'json'
+                  ? 'bg-[var(--vc-lime-main)] text-[var(--vc-black)]'
+                  : 'text-[var(--vc-white-dim)] hover:text-[var(--vc-lime-main)]'
+              }`}
+            >
+              <Code2 className="h-3 w-3" />
+              JSON
+            </button>
+          </div>
+
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-1.5 text-xs text-[var(--vc-white-dim)]">
               <input
@@ -114,51 +190,89 @@ export default function AdminWorkflowDetailPage(props: { params: Promise<{ id: s
         )}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr,320px]">
-          {/* Editor JSON */}
           <div className="space-y-4">
-            <div className="rounded-xl border border-[var(--vc-gray-dark)] bg-[var(--vc-black-mid)] p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
-                  Trigger config
+            {tab === 'visual' ? (
+              <>
+                {parseError && (
+                  <div className="rounded-lg border border-[var(--vc-warning)]/40 bg-[var(--vc-warning)]/10 p-2 text-xs text-[var(--vc-warning)]">
+                    JSON con errores — corrige en pestaña JSON para ver el canvas
+                  </div>
+                )}
+                <WorkflowCanvas
+                  steps={parsedSteps}
+                  selectedStepId={selectedStepId}
+                  onStepSelect={setSelectedStepId}
+                  onPositionsChange={handlePositionsChange}
+                />
+                <div className="flex flex-wrap items-center gap-2 text-[10px] text-[var(--vc-white-dim)]">
+                  <span>Arrastra nodos para reubicar · click para inspeccionar</span>
+                  <span className="rounded bg-[var(--vc-black-mid)] px-2 py-0.5">
+                    flecha verde = éxito
+                  </span>
+                  <span className="rounded bg-[var(--vc-black-mid)] px-2 py-0.5">
+                    roja = fallo
+                  </span>
+                  <span className="rounded bg-[var(--vc-black-mid)] px-2 py-0.5">
+                    azul = rama
+                  </span>
                 </div>
-                <div className="text-[10px] text-[var(--vc-gray-mid)]">
-                  {workflow.triggerType}
+              </>
+            ) : (
+              <>
+                <div className="rounded-xl border border-[var(--vc-gray-dark)] bg-[var(--vc-black-mid)] p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
+                      Trigger config
+                    </div>
+                    <div className="text-[10px] text-[var(--vc-gray-mid)]">
+                      {workflow.triggerType}
+                    </div>
+                  </div>
+                  <textarea
+                    value={triggerJson}
+                    onChange={e => setTriggerJson(e.target.value)}
+                    rows={6}
+                    spellCheck={false}
+                    className="w-full resize-none rounded border border-[var(--vc-gray-dark)] bg-[var(--vc-black)] p-2 font-mono text-[11px] text-[var(--vc-white-soft)] focus:border-[var(--vc-lime-main)]/50 focus:outline-none"
+                  />
                 </div>
-              </div>
-              <textarea
-                value={triggerJson}
-                onChange={e => setTriggerJson(e.target.value)}
-                rows={6}
-                spellCheck={false}
-                className="w-full resize-none rounded border border-[var(--vc-gray-dark)] bg-[var(--vc-black)] p-2 font-mono text-[11px] text-[var(--vc-white-soft)] focus:border-[var(--vc-lime-main)]/50 focus:outline-none"
-              />
-            </div>
 
-            <div className="rounded-xl border border-[var(--vc-gray-dark)] bg-[var(--vc-black-mid)] p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
-                  Steps (JSON)
+                <div className="rounded-xl border border-[var(--vc-gray-dark)] bg-[var(--vc-black-mid)] p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
+                      Steps (JSON)
+                    </div>
+                    <div className="text-[10px] text-[var(--vc-gray-mid)]">
+                      Array de {parsedSteps.length} pasos
+                    </div>
+                  </div>
+                  <textarea
+                    value={stepsJson}
+                    onChange={e => setStepsJson(e.target.value)}
+                    rows={28}
+                    spellCheck={false}
+                    className="w-full resize-none rounded border border-[var(--vc-gray-dark)] bg-[var(--vc-black)] p-2 font-mono text-[11px] text-[var(--vc-white-soft)] focus:border-[var(--vc-lime-main)]/50 focus:outline-none"
+                  />
+                  <div className="mt-1 text-[10px] text-[var(--vc-gray-mid)]">
+                    Step types: send_template · send_text · send_interactive · send_media · wait · wait_for_reply ·
+                    branch · tag · ai_decision · ai_respond · update_contact · create_order_link · call_webhook · escalate · end
+                  </div>
                 </div>
-                <div className="text-[10px] text-[var(--vc-gray-mid)]">
-                  Array de {(workflow.steps ?? []).length} pasos
-                </div>
-              </div>
-              <textarea
-                value={stepsJson}
-                onChange={e => setStepsJson(e.target.value)}
-                rows={32}
-                spellCheck={false}
-                className="w-full resize-none rounded border border-[var(--vc-gray-dark)] bg-[var(--vc-black)] p-2 font-mono text-[11px] text-[var(--vc-white-soft)] focus:border-[var(--vc-lime-main)]/50 focus:outline-none"
-              />
-              <div className="mt-1 text-[10px] text-[var(--vc-gray-mid)]">
-                Step types: send_template · send_text · send_interactive · send_media · wait · wait_for_reply ·
-                branch · tag · ai_decision · ai_respond · update_contact · create_order_link · call_webhook · escalate · end
-              </div>
-            </div>
+              </>
+            )}
           </div>
 
-          {/* Sidebar: test + historial + meta */}
           <div className="space-y-3">
+            {/* Step inspector — solo en modo visual con selección */}
+            {tab === 'visual' && selectedStep && (
+              <StepInspector
+                step={selectedStep}
+                allSteps={parsedSteps}
+                onFieldChange={handleStepFieldChange}
+                onConfigChange={handleConfigChange}
+              />
+            )}
+
             <div className="rounded-xl border border-[var(--vc-gray-dark)] bg-[var(--vc-black-mid)] p-3">
               <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
                 Probar flujo
@@ -178,9 +292,6 @@ export default function AdminWorkflowDetailPage(props: { params: Promise<{ id: s
                 {testM.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <TestTube className="h-3 w-3" />}
                 Ejecutar ahora (mock)
               </button>
-              <div className="mt-1 text-[9px] text-[var(--vc-gray-mid)]">
-                El contacto se crea/reutiliza. Mensajes van a consola en modo mock.
-              </div>
             </div>
 
             <div className="rounded-xl border border-[var(--vc-gray-dark)] bg-[var(--vc-black-mid)] p-3">
@@ -226,6 +337,122 @@ export default function AdminWorkflowDetailPage(props: { params: Promise<{ id: s
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function StepInspector({
+  step, allSteps, onFieldChange, onConfigChange,
+}: {
+  step: CanvasStep
+  allSteps: CanvasStep[]
+  onFieldChange: (field: 'id' | 'type' | 'nextOnSuccess' | 'nextOnFail', value: string) => void
+  onConfigChange: (configJson: string) => void
+}) {
+  const meta = WORKFLOW_STEP_META[step.type] ?? WORKFLOW_STEP_META.end
+  const [configDraft, setConfigDraft] = useState(JSON.stringify(step.config, null, 2))
+  const [idDraft, setIdDraft] = useState(step.id)
+
+  useEffect(() => {
+    setConfigDraft(JSON.stringify(step.config, null, 2))
+    setIdDraft(step.id)
+  }, [step.id, step.config])
+
+  const otherStepIds = allSteps.filter(s => s.id !== step.id).map(s => s.id)
+  const Icon = meta.Icon
+
+  return (
+    <div
+      className="rounded-xl border bg-[var(--vc-black-mid)] p-3"
+      style={{ borderColor: `${meta.color}55` }}
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <div
+          className="flex h-7 w-7 items-center justify-center rounded"
+          style={{ backgroundColor: `${meta.color}20`, color: meta.color }}
+        >
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
+            Inspector · {step.type}
+          </div>
+          <div className="truncate text-[11px] text-[var(--vc-white-soft)]">{meta.label}</div>
+        </div>
+        <Settings2 className="h-3 w-3 text-[var(--vc-gray-mid)]" />
+      </div>
+
+      <label className="mb-2 block">
+        <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
+          ID del step
+        </div>
+        <input
+          type="text"
+          value={idDraft}
+          onChange={e => setIdDraft(e.target.value)}
+          onBlur={() => idDraft !== step.id && onFieldChange('id', idDraft)}
+          className="w-full rounded border border-[var(--vc-gray-dark)] bg-[var(--vc-black-soft)] px-2 py-1 font-mono text-[11px] text-[var(--vc-white-soft)] focus:border-[var(--vc-lime-main)]/50 focus:outline-none"
+        />
+      </label>
+
+      <label className="mb-2 block">
+        <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
+          Tipo
+        </div>
+        <select
+          value={step.type}
+          onChange={e => onFieldChange('type', e.target.value)}
+          className="w-full rounded border border-[var(--vc-gray-dark)] bg-[var(--vc-black-soft)] px-2 py-1 text-[11px] text-[var(--vc-white-soft)] focus:border-[var(--vc-lime-main)]/50 focus:outline-none"
+        >
+          {Object.keys(WORKFLOW_STEP_META).map(t => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+      </label>
+
+      <label className="mb-2 block">
+        <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
+          Siguiente (éxito)
+        </div>
+        <select
+          value={step.nextOnSuccess ?? ''}
+          onChange={e => onFieldChange('nextOnSuccess', e.target.value)}
+          className="w-full rounded border border-[var(--vc-gray-dark)] bg-[var(--vc-black-soft)] px-2 py-1 text-[11px] text-[var(--vc-white-soft)] focus:border-[var(--vc-lime-main)]/50 focus:outline-none"
+        >
+          <option value="">— ninguno —</option>
+          {otherStepIds.map(id => <option key={id} value={id}>{id}</option>)}
+        </select>
+      </label>
+
+      <label className="mb-2 block">
+        <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
+          Siguiente (fallo)
+        </div>
+        <select
+          value={step.nextOnFail ?? ''}
+          onChange={e => onFieldChange('nextOnFail', e.target.value)}
+          className="w-full rounded border border-[var(--vc-gray-dark)] bg-[var(--vc-black-soft)] px-2 py-1 text-[11px] text-[var(--vc-white-soft)] focus:border-[var(--vc-lime-main)]/50 focus:outline-none"
+        >
+          <option value="">— ninguno —</option>
+          {otherStepIds.map(id => <option key={id} value={id}>{id}</option>)}
+        </select>
+      </label>
+
+      <label className="block">
+        <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
+          Config (JSON)
+        </div>
+        <textarea
+          value={configDraft}
+          onChange={e => {
+            setConfigDraft(e.target.value)
+            onConfigChange(e.target.value)
+          }}
+          rows={10}
+          spellCheck={false}
+          className="w-full resize-none rounded border border-[var(--vc-gray-dark)] bg-[var(--vc-black)] p-2 font-mono text-[10px] text-[var(--vc-white-soft)] focus:border-[var(--vc-lime-main)]/50 focus:outline-none"
+        />
+      </label>
     </div>
   )
 }

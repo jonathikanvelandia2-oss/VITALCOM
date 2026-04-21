@@ -1,5 +1,39 @@
 # Vitalcom Platform — Changelog
 
+## [2.9.0] — 2026-04-21
+
+**V30 completo — Visual workflow editor + Meta Graph template sync.**
+
+Cierra todo el roadmap V30. El editor de workflows ahora es visual (canvas SVG con nodos draggables + conexiones con flechas coloreadas por tipo), y un click sincroniza plantillas aprobadas desde Meta Graph API. En MOCK mode devuelve templates sintéticos para que el flujo UI funcione sin credenciales.
+
+### V30 completo — Canvas + Meta sync (`this release`)
+
+**Librerías nuevas:**
+- `src/lib/whatsapp/meta-graph.ts` — `fetchMetaTemplates()` llama `GET /v21.0/{wabaId}/message_templates` · `extractTemplateContent()` parsea componentes HEADER/BODY/FOOTER/BUTTONS · fallback `mockTemplates()` con 3 plantillas de ejemplo
+
+**APIs:**
+- `POST /api/whatsapp/templates/sync` — upsert masivo por `(accountId, metaName, language)` · mapea `status` Meta → WaTemplateStatus · infiere `purpose` desde el nombre (confirm/carrito/despacho/bienvenida) · devuelve `{ synced, created, updated, mock }`
+
+**Componente canvas:**
+- `src/components/admin/WorkflowCanvas.tsx` — SVG con viewBox dinámico según posiciones · grid pattern de fondo · 15 colores + iconos distintos por step type · auto-layout topológico BFS si no hay `step.position` · drag-drop directo sobre nodos · edges con bezier curvas + flechas coloreadas (lime=éxito, rojo=fallo, azul=rama) · labels de rama visibles
+
+**UI admin:**
+- `/admin/workflows/[id]` — rediseñada con **tabs Visual/JSON** · en Visual: canvas interactivo + inspector lateral al seleccionar un nodo (ID, tipo dropdown, siguiente éxito/fallo con selects de IDs existentes, config JSON editable en vivo) · arrastrar nodos persiste `step.position` en el JSON al guardar
+- `/admin/whatsapp/templates` — botón "Sync Meta" descarga plantillas aprobadas + banner de resultado (X creadas · Y actualizadas · mock si aplica)
+
+**Hook nuevo:**
+- `useSyncMetaTemplates()` en `@/hooks/useWaTemplates`
+
+**Interface extendida:**
+- `WorkflowStep.position?: { x: number; y: number }` — opcional, auto-layout si está ausente
+
+**Todo V30 del blueprint V21 ahora cubierto:**
+- ✅ Broadcast scheduling cron (v2.8.0)
+- ✅ Opt-out automático STOP/ALTA (v2.8.0)
+- ✅ Visual workflow editor canvas SVG (esta release)
+- ✅ Template sync Meta Graph API (esta release)
+- ✅ Validación disclosure MARKETING (v2.8.0)
+
 ## [2.8.0] — 2026-04-21
 
 **V30 liviano — Broadcast scheduling cron + opt-out automático.**

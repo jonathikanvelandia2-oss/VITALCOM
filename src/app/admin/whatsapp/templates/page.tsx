@@ -3,12 +3,12 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   FileText, Plus, Loader2, CheckCircle2, XCircle, Clock, AlertTriangle,
-  Trash2, Save, GitMerge, BarChart3,
+  Trash2, Save, GitMerge, BarChart3, RefreshCw,
 } from 'lucide-react'
 import { AdminTopbar } from '@/components/admin/AdminTopbar'
 import {
   useWaTemplates, useCreateWaTemplate, useUpdateWaTemplate, useDeleteWaTemplate,
-  useAbStats,
+  useAbStats, useSyncMetaTemplates,
   type WaTemplateCategory, type WaTemplateStatus, type WaTemplate,
 } from '@/hooks/useWaTemplates'
 import { useWhatsappAccounts } from '@/hooks/useWaWorkflows'
@@ -46,7 +46,9 @@ export default function AdminTemplatesPage() {
   const createM = useCreateWaTemplate()
   const updateM = useUpdateWaTemplate()
   const deleteM = useDeleteWaTemplate()
+  const syncM = useSyncMetaTemplates()
   const abStatsQ = useAbStats(selectedAccount, abGroup)
+  const [syncResult, setSyncResult] = useState<{ created: number; updated: number; mock: boolean } | null>(null)
 
   const templates = useMemo(() => templatesQ.data?.items ?? [], [templatesQ.data])
   const variantGroups = useMemo(() => {
@@ -128,15 +130,50 @@ export default function AdminTemplatesPage() {
             {templates.length} plantilla{templates.length !== 1 ? 's' : ''}
             {variantGroups.length > 0 && ` · ${variantGroups.length} grupo${variantGroups.length > 1 ? 's' : ''} A/B`}
           </div>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            disabled={!selectedAccount}
-            className="flex items-center gap-1.5 rounded-lg bg-[var(--vc-lime-main)] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[var(--vc-black)] hover:bg-[var(--vc-lime-electric)] disabled:opacity-40"
-          >
-            <Plus className="h-3 w-3" />
-            {showForm ? 'Cancelar' : 'Nueva'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                if (!selectedAccount) return
+                const r = await syncM.mutateAsync(selectedAccount)
+                setSyncResult({ created: r.created, updated: r.updated, mock: r.mock })
+              }}
+              disabled={!selectedAccount || syncM.isPending}
+              title="Descargar plantillas aprobadas desde Meta Graph API"
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--vc-info)]/40 bg-[var(--vc-info)]/10 px-2.5 py-1.5 text-xs font-semibold text-[var(--vc-info)] hover:bg-[var(--vc-info)]/20 disabled:opacity-40"
+            >
+              {syncM.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3" />
+              )}
+              Sync Meta
+            </button>
+            <button
+              onClick={() => setShowForm(!showForm)}
+              disabled={!selectedAccount}
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--vc-lime-main)] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[var(--vc-black)] hover:bg-[var(--vc-lime-electric)] disabled:opacity-40"
+            >
+              <Plus className="h-3 w-3" />
+              {showForm ? 'Cancelar' : 'Nueva'}
+            </button>
+          </div>
         </div>
+
+        {syncResult && (
+          <div className="mb-3 flex items-center justify-between rounded-lg border border-[var(--vc-info)]/40 bg-[var(--vc-info)]/10 px-3 py-2 text-xs text-[var(--vc-info)]">
+            <span>
+              ✓ Sincronizado: <strong>{syncResult.created}</strong> creadas ·{' '}
+              <strong>{syncResult.updated}</strong> actualizadas
+              {syncResult.mock && ' · (modo MOCK — conecta META_APP_SECRET para datos reales)'}
+            </span>
+            <button
+              onClick={() => setSyncResult(null)}
+              className="text-[var(--vc-info)] opacity-60 hover:opacity-100"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Create form */}
         {showForm && (
