@@ -35,6 +35,10 @@
     {
       "path": "/api/alerts/cron",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/health/cron",
+      "schedule": "0 9 * * *"
     }
   ]
 }

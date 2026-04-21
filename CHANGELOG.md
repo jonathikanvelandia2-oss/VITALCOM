@@ -1,5 +1,44 @@
 # Vitalcom Platform — Changelog
 
+## [2.13.0] — 2026-04-21
+
+**V32 — Health Score del VITALCOMMER + retención automática.**
+
+Cada miembro tiene un score 0-100 que resume 7 factores (actividad reciente, comunidad, pedidos 30d, tienda Shopify, formación, metas, puntos). Un cron diario recalcula todos; si un miembro cae de segmento (ACTIVE → AT_RISK o AT_RISK → CHURNED) el sistema dispara una notificación de retención automática. Admin ve el mapa completo de la comunidad por segmento.
+
+**Schema:**
+- `UserHealthScore` unique por userId · score + segment + breakdown JSON + scoreDelta + previousSegment + lastRetentionTriggerAt
+- Enum `UserHealthSegment`: NEW · ACTIVE · AT_RISK · CHURNED
+- Relación `User.healthScore`
+
+**Calculator (puro):**
+- `src/lib/health/calculator.ts` — 7 sub-scorers puros (login/community/orders/store/learning/goals/points) + `classifySegment()` + `computeHealthScore()` orquestador con reasons
+- Pesos: orders 25 · login 20 · community 15 · store 10 · learning 10 · goals 10 · points 10 = 100
+
+**Service (BD):**
+- `src/lib/health/service.ts` — `computeUserHealth()` · `upsertUserHealthScore()` con delta + previousSegment · `runHealthScoreBatch()` · trigger de retención si segmento empeora
+
+**APIs:**
+- `GET /api/health` — mi score (calcula al vuelo si no existe)
+- `POST /api/health` — recalcular a demanda
+- `GET /api/admin/health?segment=` — listado admin con counts por segmento
+- `GET|POST /api/health/cron` — Vercel cron con CRON_SECRET
+
+**UI comunidad:**
+- `/mi-score` — hero con arco SVG semicircular + badge segmento + delta tendencia · breakdown 7 factores con barras + hint de mejora + link a la página relevante
+- Nav: entrada "Mi Score" en `CommunitySidebar`
+
+**UI admin:**
+- `/admin/comunidad/health` — 4 cards de conteo por segmento (filtra al clickear) · lista ordenada por score ASC (en riesgo primero) · breakdown inline · banner explicativo
+
+**Hook React Query:**
+- `useMyHealthScore` · `useRefreshMyHealthScore` · `useAdminHealthScores` + `SEGMENT_META` + `FACTOR_META`
+
+**Cron:**
+- `vercel.json` → `"/api/health/cron"` schedule `0 9 * * *` (4am COL = 9am UTC)
+
+**Tests:** 134/134 ✅ (+27 sobre calculator: cada sub-scorer + classifySegment + casos completos ACTIVE/CHURNED/NEW + invariantes breakdown-sum=score)
+
 ## [2.12.0] — 2026-04-21
 
 **V31 — Alertas proactivas para el dropshipper.**

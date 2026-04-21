@@ -150,6 +150,8 @@ model User {
   waWorkflows             WaWorkflow[]
   // V31 — Alertas proactivas
   proactiveAlerts         ProactiveAlert[]
+  // V32 — Health Score
+  healthScore             UserHealthScore?
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1921,4 +1923,40 @@ model ProactiveAlertLog {
   errorMessage String?
 
   @@index([alertId, deliveredAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+// V32 — Health Score del VITALCOMMER
+// ═══════════════════════════════════════════════════════════
+// Snapshot actual del estado de salud de cada miembro de la
+// comunidad. Cron diario recalcula. El delta permite trend y
+// disparar flujos de retención cuando cae de ACTIVE → AT_RISK.
+
+enum UserHealthSegment {
+  NEW      // Registrado hace < 7 días (no se califica aún)
+  ACTIVE   // Score >= 60
+  AT_RISK  // Score 30-59
+  CHURNED  // Score < 30
+}
+
+model UserHealthScore {
+  id             String            @id @default(cuid())
+  userId         String            @unique
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Score actual 0-100
+  score          Int               @default(0)
+  segment        UserHealthSegment @default(NEW)
+  // Desglose por factor (JSON con nombres de factor + puntos)
+  breakdown      Json              @default("{}")
+  // Trend
+  previousScore  Int?
+  scoreDelta     Int?
+  previousSegment UserHealthSegment?
+  // Metadatos
+  computedAt     DateTime          @default(now())
+  // Retención: último flujo disparado
+  lastRetentionTriggerAt DateTime?
+
+  @@index([segment, computedAt])
+  @@index([score])
 }
