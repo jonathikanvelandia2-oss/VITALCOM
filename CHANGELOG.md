@@ -1,5 +1,29 @@
 # Vitalcom Platform — Changelog
 
+## [2.1.0] — 2026-04-21
+
+**V23 Bots autónomos · Vercel Cron operativo.**
+
+Primer bloque de bots del plan original (9 prometidos al CEO). Los 5 foundation arrancan: cada uno corre en su propio schedule, deja trazabilidad completa en BotRun y admin puede dispararlos manualmente para testing.
+
+### V23 — Bots autónomos (`this release`)
+- Modelo `BotRun` con tracking de métricas + errorLog JSON
+- Enum `BotName` (9 slots, 5 implementados, 4 placeholder para futuras versiones)
+- Enum `BotRunStatus`: RUNNING · SUCCESS · FAILED · PARTIAL
+- Runner `src/lib/bots/types.ts` con `runBotWithTracking(bot, fn)`: abre BotRun, corre, cierra con duración y status automático
+- **5 bots entregados:**
+  - `StockBot` — alerta stock <20u a dropshippers que venden el producto (daily 15:00 UTC)
+  - `RestockBot` — notifica admins cuando cobertura <14 días (L/Mi/V 16:00 UTC)
+  - `AdsBot` — dispara MediaBuyer para todos los usuarios con ads activas + sync críticas a bell (daily 13:00 UTC)
+  - `InactivityBot` — nudge dropshippers con 7+ días sin actividad, max 2/30d (L/Mi/V 17:00 UTC)
+  - `OnboardingBot` — 7 pasos guiados los primeros 7 días del nuevo user (daily 14:00 UTC)
+- Endpoint `/api/cron/bots` protegido con `CRON_SECRET` Bearer
+- `vercel.json` con 5 cron schedules
+- Admin UI `/admin/bots`: tarjetas por bot con stats + botón "EJECUTAR AHORA" manual + timeline de corridas con status/duración
+- `/api/admin/bots/run` para trigger manual (solo SUPERADMIN/ADMIN)
+
+---
+
 ## [2.0.0] — 2026-04-21
 
 **Suite IA completa entregada · 9 agentes + orquestación + impact tracking.**

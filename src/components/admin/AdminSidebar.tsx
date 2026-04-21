@@ -32,6 +32,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/admin', label: 'Dashboard general', icon: LayoutDashboard },
       { href: '/admin/asistente', label: 'Asesor CEO (IA)', icon: Brain, badge: 'IA' },
+      { href: '/admin/bots', label: 'Bots autónomos', icon: Bot, badge: 'NEW' },
       { href: '/admin/inbox', label: 'Inbox interno', icon: Inbox },
       { href: '/admin/cache-stats', label: 'Cache stats', icon: Gauge },
       { href: '/admin/ajustes', label: 'Ajustes', icon: Settings },

@@ -1060,3 +1060,53 @@ model AppliedAction {
   @@index([userId, appliedAt])
   @@index([userId, source])
 }
+
+// ─────────────────────────────────────────────────────────
+// BOTS AUTÓNOMOS (V23) — Ejecuciones background por Vercel Cron
+// ─────────────────────────────────────────────────────────
+// Cada BotRun registra una corrida: qué bot, cuándo, cuántos
+// usuarios/items procesados, duración, errores. Permite
+// debugging + métricas para el admin.
+
+enum BotName {
+  STOCK_BOT        // Alerta stock bajo por producto
+  RESTOCK_BOT      // Notifica pedidos de reposición a admin
+  ADS_BOT          // Monitorea ROAS/CPA y dispara recs
+  INACTIVITY_BOT   // Reactiva dropshippers dormidos
+  ONBOARDING_BOT   // Guía primeros 7 días del nuevo user
+  SEO_BOT          // Genera meta tags automáticos (future)
+  CONTENT_BOT      // Sugiere posts semanales (future)
+  FULFILLMENT_BOT  // Sync tracking Dropi (future)
+  PRECIO_BOT       // Ajusta precios sugeridos (future)
+}
+
+enum BotRunStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  PARTIAL   // Algunos usuarios OK, otros con error
+}
+
+model BotRun {
+  id            String       @id @default(cuid())
+  bot           BotName
+  status        BotRunStatus @default(RUNNING)
+
+  startedAt     DateTime     @default(now())
+  finishedAt    DateTime?
+  durationMs    Int?
+
+  // Métricas de la corrida
+  usersProcessed Int         @default(0)
+  itemsAffected  Int         @default(0)
+  notifsCreated  Int         @default(0)
+  errors         Int         @default(0)
+
+  // Output estructurado para debugging
+  summary       String?
+  errorLog      Json?
+  triggeredBy   String?      @default("cron")  // 'cron' | 'manual' | userId
+
+  @@index([bot, startedAt])
+  @@index([status, startedAt])
+}

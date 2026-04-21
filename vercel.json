@@ -1,0 +1,24 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/bots?bot=ONBOARDING_BOT",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/bots?bot=STOCK_BOT",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/bots?bot=RESTOCK_BOT",
+      "schedule": "0 16 * * 1,3,5"
+    },
+    {
+      "path": "/api/cron/bots?bot=ADS_BOT",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/bots?bot=INACTIVITY_BOT",
+      "schedule": "0 17 * * 1,3,5"
+    }
+  ]
+}
