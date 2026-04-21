@@ -8,10 +8,16 @@
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
-import { verifyMetaSignature } from '@/lib/whatsapp/client'
+import { verifyMetaSignature, sendText } from '@/lib/whatsapp/client'
 import { advanceOnReply, startWorkflow } from '@/lib/flows/workflow-engine'
 import { classify } from '@/lib/ai/intent-classifier'
 import { rateLimitWebhook, getClientKey } from '@/lib/security/rate-limit-webhook'
+import {
+  isOptOutMessage,
+  isOptInMessage,
+  OPT_OUT_CONFIRMATION_TEXT,
+  OPT_IN_CONFIRMATION_TEXT,
+} from '@/lib/whatsapp/opt-out'
 import {
   WaMessageDirection, WaMessageStatus, WaMessageType,
   WaWorkflowTrigger,
@@ -266,11 +272,82 @@ async function processInboundMessage(
     data: { messagesIn: { increment: 1 } },
   })
 
+  // V30 — Opt-out / opt-in: corta todo el resto del procesamiento
+  if (content && isOptOutMessage(content)) {
+    await handleOptOut(accountId, contact.id, conversation.id, phoneE164)
+    return
+  }
+  if (content && isOptInMessage(content) && contact.isOptedIn === false) {
+    await handleOptIn(accountId, contact.id, conversation.id, phoneE164)
+    return
+  }
+
   // 1) Avanzar workflows que esperaban reply
   await advanceOnReply(conversation.id)
 
   // 2) Disparar workflows con trigger MESSAGE_RECEIVED si hay match
   await tryTriggerMessageWorkflows(accountId, contact.id, conversation.id, content ?? '')
+}
+
+async function handleOptOut(
+  accountId: string,
+  contactId: string,
+  conversationId: string,
+  phoneE164: string,
+): Promise<void> {
+  await prisma.whatsappContact.update({
+    where: { id: contactId },
+    data: {
+      isOptedIn: false,
+      optedOutAt: new Date(),
+      optOutSource: 'stop_keyword',
+    },
+  })
+
+  // Cancelar ejecuciones de workflows activas para este contacto
+  await prisma.waExecution.updateMany({
+    where: { contactId, status: 'RUNNING' },
+    data: { status: 'CANCELLED', completedAt: new Date() },
+  }).catch(err => console.error('[opt-out] cancel executions:', err))
+
+  // Confirmación dentro de ventana 24h (el usuario acaba de escribir)
+  try {
+    await sendText({
+      accountId,
+      toPhoneE164: phoneE164,
+      text: OPT_OUT_CONFIRMATION_TEXT,
+      conversationId,
+    })
+  } catch (err) {
+    console.error('[opt-out] confirm send failed:', err)
+  }
+}
+
+async function handleOptIn(
+  accountId: string,
+  contactId: string,
+  conversationId: string,
+  phoneE164: string,
+): Promise<void> {
+  await prisma.whatsappContact.update({
+    where: { id: contactId },
+    data: {
+      isOptedIn: true,
+      optedOutAt: null,
+      optOutSource: null,
+    },
+  })
+
+  try {
+    await sendText({
+      accountId,
+      toPhoneE164: phoneE164,
+      text: OPT_IN_CONFIRMATION_TEXT,
+      conversationId,
+    })
+  } catch (err) {
+    console.error('[opt-in] confirm send failed:', err)
+  }
 }
 
 async function processStatusUpdate(status: MetaStatusUpdate): Promise<void> {

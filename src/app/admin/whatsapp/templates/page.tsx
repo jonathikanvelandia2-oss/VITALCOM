@@ -177,8 +177,17 @@ export default function AdminTemplatesPage() {
               </label>
             </div>
             <div className="mt-3">
-              <Field label="Footer (opcional)" value={form.footerText} onChange={v => setForm({ ...form, footerText: v })} placeholder="Responde SI para confirmar" />
+              <Field label="Footer (opcional)" value={form.footerText} onChange={v => setForm({ ...form, footerText: v })} placeholder="Responde SI para confirmar · Responde STOP para no recibir más" />
             </div>
+            {form.category === 'MARKETING' && !/(stop|baja|darse\s+de\s+baja|no\s+recibir\s+m[aá]s|unsubscribe)/i.test(form.bodyText + ' ' + form.footerText) && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-[var(--vc-warning)]/40 bg-[var(--vc-warning)]/10 px-3 py-2 text-[11px] text-[var(--vc-warning)]">
+                <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                <div>
+                  <strong>Meta exige opt-out visible en plantillas MARKETING.</strong>{' '}
+                  Agrega algo como &ldquo;Responde STOP para no recibir más mensajes&rdquo; al body o footer, o la API rechazará el guardado.
+                </div>
+              </div>
+            )}
             <div className="mt-3">
               <button
                 type="submit"

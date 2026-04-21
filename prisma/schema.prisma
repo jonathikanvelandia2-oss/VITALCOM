@@ -1588,6 +1588,7 @@ model WhatsappBroadcastRecipient {
   broadcastId   String
   broadcast     WhatsappBroadcast          @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
   contactId     String
+  contact       WhatsappContact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
   phoneE164     String
   templateId    String?
   template      WhatsappTemplate?          @relation(fields: [templateId], references: [id], onDelete: SetNull)
@@ -1630,6 +1631,8 @@ model WhatsappContact {
   segment             String? // hot_lead | repeat_buyer | at_risk | cancelador | vip
   // Estado
   isOptedIn           Boolean         @default(true)
+  optedOutAt          DateTime?
+  optOutSource        String? // "stop_keyword" | "admin" | "bounce"
   lastInteractionAt   DateTime?
   lastConversationId  String?
   // Ventana 24h (regla WhatsApp Business)
@@ -1637,8 +1640,9 @@ model WhatsappContact {
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 
-  conversations WhatsappConversation[]
-  orders        WhatsappOrderLink[]
+  conversations       WhatsappConversation[]
+  orders              WhatsappOrderLink[]
+  broadcastRecipients WhatsappBroadcastRecipient[]
 
   @@unique([accountId, phoneE164])
   @@index([accountId, segment])

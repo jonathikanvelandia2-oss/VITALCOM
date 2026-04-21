@@ -27,6 +27,10 @@
     {
       "path": "/api/flows/cron",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/whatsapp/broadcasts/cron",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

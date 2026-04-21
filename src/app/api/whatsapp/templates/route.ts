@@ -4,6 +4,7 @@ import { apiError, apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/db/prisma'
 import { WaTemplateCategory, WaTemplateStatus } from '@prisma/client'
+import { marketingTemplateHasOptOut } from '@/lib/whatsapp/opt-out'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,6 +72,19 @@ export const POST = withErrorHandler(async (req: Request) => {
     where: { id: data.accountId, userId: session.id },
   })
   if (!account) return apiError('Cuenta no encontrada', 404, 'NOT_FOUND')
+
+  // V30 — Meta exige mención de opt-out en plantillas MARKETING
+  if (data.category === WaTemplateCategory.MARKETING) {
+    const combined = [data.bodyText, data.footerText ?? ''].join(' ')
+    if (!marketingTemplateHasOptOut(combined)) {
+      return apiError(
+        'Las plantillas MARKETING deben incluir cómo darse de baja. ' +
+          'Agrega algo como: "Responde STOP para no recibir más mensajes."',
+        400,
+        'MISSING_OPT_OUT',
+      )
+    }
+  }
 
   const template = await prisma.whatsappTemplate.create({
     data: {

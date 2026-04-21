@@ -1,5 +1,45 @@
 # Vitalcom Platform — Changelog
 
+## [2.8.0] — 2026-04-21
+
+**V30 liviano — Broadcast scheduling cron + opt-out automático.**
+
+Cierra dos loops abiertos de V29 y blinda cumplimiento Meta. Los broadcasts ahora pueden agendarse a futuro y ejecutarse solos; los contactos pueden darse de baja con un mensaje *STOP* y el sistema honra su elección automáticamente en todos los canales (broadcasts + workflows). Validación forzada de disclosure al crear plantillas MARKETING.
+
+### V30 — Scheduling + opt-out (`this release`)
+
+**Schema Prisma (+2 campos + 1 relación):**
+- `WhatsappContact.optedOutAt DateTime?` + `.optOutSource String?` — audit log de la baja (stop_keyword | admin | bounce)
+- `WhatsappBroadcastRecipient.contact` — relación con WhatsappContact para revalidar opt-in justo antes de enviar
+
+**Librería nueva:**
+- `src/lib/whatsapp/opt-out.ts` — detección centralizada: `isOptOutMessage()` (regex: STOP, BAJA, SALIR, CANCELAR, UNSUBSCRIBE, PARAR, NO MÁS, DARME DE BAJA), `isOptInMessage()` (ALTA, VOLVER, SUSCRIBIR), `marketingTemplateHasOptOut()` validador de plantillas, textos de confirmación
+
+**APIs nuevas/modificadas:**
+- `GET/POST /api/whatsapp/broadcasts/cron` — cron `*/10 * * * *` que busca broadcasts `SCHEDULED` con `scheduledFor <= now` y los ejecuta. También reanuda broadcasts `RUNNING` con recipients PENDING (recovery de crashes por timeout de 60s). Auth Bearer `CRON_SECRET`.
+- `POST /api/whatsapp/templates` — valida que plantillas MARKETING contengan disclosure opt-out en body+footer. Devuelve `400 MISSING_OPT_OUT` si falta.
+
+**Webhook WhatsApp (`/api/webhooks/whatsapp`):**
+- Detecta STOP antes de avanzar workflows → `handleOptOut()` marca contacto `isOptedIn=false` + `optedOutAt=now` + `optOutSource='stop_keyword'` + cancela ejecuciones RUNNING del contacto + envía confirmación dentro de ventana 24h
+- Detecta ALTA → `handleOptIn()` restaura `isOptedIn=true` + confirma
+
+**Broadcast runner (`src/lib/whatsapp/broadcast-runner.ts`):**
+- Revalida `contact.isOptedIn` justo antes de enviar (puede haber cambiado entre `prepareBroadcast` y `executeBroadcast`) → si opted out, marca recipient como `SKIPPED` con `failureReason='contact_opted_out'`
+- `optedOutCount` en el broadcast se incrementa correctamente
+- Progreso intermedio ahora es idempotente (set absoluto, no increment acumulativo bugueado)
+- `executeBroadcast` devuelve `{ sent, failed, skippedOptOut? }`
+
+**UI admin:**
+- `/admin/whatsapp/broadcasts` — campo "Programar para" (datetime-local) + botón cambia a "Agendar" cuando hay fecha + tarjeta del broadcast muestra `Agendado para {fecha}` cuando está SCHEDULED
+- `/admin/whatsapp/templates` — warning visible en vivo si categoría MARKETING y body/footer no contienen disclosure opt-out
+
+**vercel.json:** +1 cron `/api/whatsapp/broadcasts/cron` cada 10min
+
+**Bug fix:**
+- Bug de contador agregado en broadcast-runner: se usaba `{ increment: pending.length - failed }` que no reflejaba el estado real. Ahora se hace `set` absoluto con las variables acumuladas `sent`/`failed`/`skippedOptOut`.
+
+**No depende de credenciales externas:** el cron puede correr en MOCK mode — los broadcasts se marcan como enviados aunque no haya cuenta Meta verificada.
+
 ## [2.7.0] — 2026-04-21
 
 **V29 Templates library + Broadcast segmentado + A/B testing automático.**

@@ -60,6 +60,7 @@ export default function BroadcastsPage() {
     country: '',
     minLtv: '',
     bodyVariables: '',
+    scheduledFor: '', // datetime-local, vacío = enviar ahora
   })
   const [previewData, setPreviewData] = useState<{ total: number; sample: Array<{ firstName: string | null; phoneMasked: string }> } | null>(null)
 
@@ -81,6 +82,7 @@ export default function BroadcastsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedAccount) return
+    const scheduledIso = form.scheduledFor ? new Date(form.scheduledFor).toISOString() : undefined
     const res = await createM.mutateAsync({
       accountId: selectedAccount,
       name: form.name,
@@ -89,12 +91,15 @@ export default function BroadcastsPage() {
       segmentFilter: buildFilter(),
       variantGroup: form.variantGroup || undefined,
       bodyVariables: form.bodyVariables ? form.bodyVariables.split('|').map(s => s.trim()) : undefined,
+      scheduledFor: scheduledIso,
     })
     setShowForm(false)
     setPreviewData(null)
-    setForm({ name: '', templateName: '', languageCode: 'es_CO', variantGroup: '', segment: '', tags: '', excludeTags: '', country: '', minLtv: '', bodyVariables: '' })
-    // Auto-ejecutar si no hay schedule
-    await executeM.mutateAsync(res.id)
+    setForm({ name: '', templateName: '', languageCode: 'es_CO', variantGroup: '', segment: '', tags: '', excludeTags: '', country: '', minLtv: '', bodyVariables: '', scheduledFor: '' })
+    // Auto-ejecutar solo si NO hay schedule futuro (el cron tomará los agendados)
+    if (!scheduledIso) {
+      await executeM.mutateAsync(res.id)
+    }
   }
 
   return (
@@ -174,6 +179,20 @@ export default function BroadcastsPage() {
                 </select>
               </label>
               <Field label="Body variables (separadas por |)" value={form.bodyVariables} onChange={v => setForm({ ...form, bodyVariables: v })} placeholder="Promo BF | 40% off | hoy" />
+              <label className="block">
+                <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--vc-white-dim)]">
+                  Programar para (opcional)
+                </div>
+                <input
+                  type="datetime-local"
+                  value={form.scheduledFor}
+                  onChange={e => setForm({ ...form, scheduledFor: e.target.value })}
+                  className="w-full rounded border border-[var(--vc-gray-dark)] bg-[var(--vc-black-soft)] px-2 py-1.5 text-xs text-[var(--vc-white-soft)] focus:border-[var(--vc-lime-main)]/50 focus:outline-none"
+                />
+                <div className="mt-0.5 text-[9px] text-[var(--vc-gray-mid)]">
+                  Vacío = enviar ahora · Con fecha = el cron lo ejecuta cuando corresponda
+                </div>
+              </label>
             </div>
 
             <div className="mb-4 rounded-lg border border-[var(--vc-gray-dark)] bg-[var(--vc-black-soft)]/30 p-3">
@@ -214,10 +233,12 @@ export default function BroadcastsPage() {
                 className="flex items-center gap-1.5 rounded-lg bg-[var(--vc-lime-main)] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-[var(--vc-black)] hover:bg-[var(--vc-lime-electric)] disabled:opacity-40"
               >
                 {createM.isPending || executeM.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
-                Crear y ejecutar
+                {form.scheduledFor ? 'Agendar' : 'Crear y ejecutar'}
               </button>
               <div className="text-[10px] text-[var(--vc-white-dim)]">
-                Se envía inmediato en modo mock · respeta opt-out
+                {form.scheduledFor
+                  ? 'Se ejecutará automáticamente vía cron a la hora programada'
+                  : 'Se envía inmediato en modo mock · respeta opt-out'}
               </div>
             </div>
           </form>
@@ -272,6 +293,16 @@ export default function BroadcastsPage() {
                     <div className="text-[10px] text-[var(--vc-white-dim)]">
                       Plantilla: <code>{b.templateName}</code> · {b.account.name}
                     </div>
+                    {b.status === 'SCHEDULED' && b.scheduledFor && (
+                      <div className="mt-0.5 flex items-center gap-1 text-[10px] text-[#3CC6FF]">
+                        <Clock className="h-2.5 w-2.5" />
+                        Agendado para{' '}
+                        {new Date(b.scheduledFor).toLocaleString('es-CO', {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })}
+                      </div>
+                    )}
                   </div>
                   <ChevronRight className="h-4 w-4 text-[var(--vc-gray-mid)]" />
                 </div>

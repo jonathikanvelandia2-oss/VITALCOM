@@ -119,6 +119,7 @@ export async function prepareBroadcast(broadcastId: string): Promise<{
 export async function executeBroadcast(broadcastId: string): Promise<{
   sent: number
   failed: number
+  skippedOptOut?: number
 }> {
   const broadcast = await prisma.whatsappBroadcast.findUniqueOrThrow({
     where: { id: broadcastId },
@@ -136,18 +137,33 @@ export async function executeBroadcast(broadcastId: string): Promise<{
 
   let sent = 0
   let failed = 0
+  let skippedOptOut = 0
   const BATCH = 50
   let offset = 0
 
   while (true) {
     const pending = await prisma.whatsappBroadcastRecipient.findMany({
       where: { broadcastId, status: WaBroadcastRecipientStatus.PENDING },
-      include: { template: true },
+      include: { template: true, contact: { select: { isOptedIn: true } } },
       take: BATCH,
     })
     if (pending.length === 0) break
 
     for (const r of pending) {
+      // V30 — Revalidar opt-in justo antes de enviar (puede haber
+      // cambiado entre prepareBroadcast y executeBroadcast)
+      if (r.contact && r.contact.isOptedIn === false) {
+        await prisma.whatsappBroadcastRecipient.update({
+          where: { id: r.id },
+          data: {
+            status: WaBroadcastRecipientStatus.SKIPPED,
+            failureReason: 'contact_opted_out',
+          },
+        })
+        skippedOptOut++
+        continue
+      }
+
       try {
         const templateName = r.template?.metaName ?? broadcast.templateName
         const res = await sendTemplate({
@@ -184,12 +200,13 @@ export async function executeBroadcast(broadcastId: string): Promise<{
       }
     }
 
-    // Actualizar contadores agregados
+    // Progreso intermedio (idempotente — set absoluto, no increment)
     await prisma.whatsappBroadcast.update({
       where: { id: broadcastId },
       data: {
-        sentCount: { increment: pending.filter(r => true).length - failed },
+        sentCount: sent,
         failedCount: failed,
+        optedOutCount: skippedOptOut,
       },
     }).catch(() => {})
 
@@ -208,6 +225,7 @@ export async function executeBroadcast(broadcastId: string): Promise<{
     data: {
       sentCount: sent,
       failedCount: failed,
+      optedOutCount: skippedOptOut,
       ...(stillPending === 0 && {
         status: WaBroadcastStatus.COMPLETED,
         completedAt: new Date(),
@@ -215,7 +233,7 @@ export async function executeBroadcast(broadcastId: string): Promise<{
     },
   })
 
-  return { sent, failed }
+  return { sent, failed, skippedOptOut }
 }
 
 // Estadísticas agregadas por variante (para dashboard A/B)
