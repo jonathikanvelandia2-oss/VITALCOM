@@ -1,5 +1,20 @@
 # Vitalcom Platform — Changelog
 
+## [2.10.0] — 2026-04-21
+
+**Fase 10 — Suite de tests vitest sobre módulos críticos.**
+
+Blindaje pre-producción: 91 tests nuevos sobre los módulos más críticos de la lógica de WhatsApp y IA. La suite total queda en **92 tests** (pricing calculator + los 5 nuevos). Todo pasa en <1s y no depende de BD, red ni LLMs.
+
+**Tests nuevos:**
+- `src/lib/whatsapp/__tests__/opt-out.test.ts` — 16 tests · cobertura regex de STOP/ALTA/BAJA/unsubscribe/no molestar · validación de disclosure MARKETING · null/undefined safe · tolerancia de espacios y `!`
+- `src/lib/whatsapp/__tests__/meta-graph.test.ts` — 12 tests · `extractTemplateContent()` parseando HEADER/BODY/FOOTER/BUTTONS (QUICK_REPLY, URL, PHONE_NUMBER normalizado) · modo MOCK devuelve 3 templates sintéticos incluyendo MARKETING con disclosure
+- `src/lib/whatsapp/__tests__/ab-testing.test.ts` — 9 tests · `pickWeightedVariant()` distribución 50/50 y 80/20 con ±5% tolerancia sobre 10k corridas · edge cases: array vacío, pesos negativos, peso único · mockeo de `Math.random` para determinismo
+- `src/lib/ai/__tests__/intent-classifier.test.ts` — 33 tests · cobertura de los 9 agentes (ESCALATE_HUMAN, MENTOR_FINANCIERO, MEDIA_BUYER, CREATIVO_MAKER, OPTIMIZADOR_TIENDA, BLUEPRINT_ANALYST, SOPORTE_IA, VITA) · boost de urgencia por "urgente"/"crítico" · `shouldEscalate` se activa en crítico o ESCALATE_HUMAN · confianza en `[0,1]`
+- `src/lib/ai/__tests__/llm-router.test.ts` — 11 tests · `cosine()` simétrica, ortogonales=0, opuestos=-1, vector cero no NaN, longitudes distintas=0 · `getRouterHealth()` estructura + circuit breakers · flag `anthropicEnabled` refleja env
+
+**Resultado:** `npx vitest run` → 92/92 ✅ en 766ms. Build y typecheck limpios.
+
 ## [2.9.0] — 2026-04-21
 
 **V30 completo — Visual workflow editor + Meta Graph template sync.**
