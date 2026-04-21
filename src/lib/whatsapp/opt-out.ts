@@ -45,3 +45,72 @@ export function marketingTemplateHasOptOut(text: string): boolean {
 // Footer sugerido para que el operador copie al crear una MARKETING
 export const SUGGESTED_MARKETING_FOOTER =
   'Responde STOP para no recibir más mensajes.'
+
+// V30.1 — auto-append del disclosure a una plantilla MARKETING
+// Devuelve un nuevo { bodyText, footerText } con opt-out garantizado.
+// Estrategia: prefiere agregar al footer (limpio, no cambia el body).
+// Solo toca el body si footer ya no cabe (60 chars límite Meta).
+const META_FOOTER_LIMIT = 60
+const META_BODY_LIMIT = 1024
+
+export interface MarketingTemplateTexts {
+  bodyText: string
+  footerText?: string | null | undefined
+}
+
+export interface AutoAppendResult {
+  bodyText: string
+  footerText: string | null
+  modified: boolean
+  target: 'footer' | 'body' | 'none'
+}
+
+export function ensureMarketingOptOut(input: MarketingTemplateTexts): AutoAppendResult {
+  const body = input.bodyText
+  const footer = input.footerText ?? null
+  const combined = [body, footer ?? ''].join(' ')
+
+  if (marketingTemplateHasOptOut(combined)) {
+    return { bodyText: body, footerText: footer, modified: false, target: 'none' }
+  }
+
+  // 1) Si no hay footer, ponemos el sugerido
+  if (!footer) {
+    return {
+      bodyText: body,
+      footerText: SUGGESTED_MARKETING_FOOTER,
+      modified: true,
+      target: 'footer',
+    }
+  }
+
+  // 2) Si hay footer pero cabe el disclosure, lo concatenamos
+  const candidateFooter = `${footer.trim()} ${SUGGESTED_MARKETING_FOOTER}`
+  if (candidateFooter.length <= META_FOOTER_LIMIT) {
+    return {
+      bodyText: body,
+      footerText: candidateFooter,
+      modified: true,
+      target: 'footer',
+    }
+  }
+
+  // 3) Fallback: si el footer no admite más, vamos al body
+  const candidateBody = `${body.trim()}\n\n${SUGGESTED_MARKETING_FOOTER}`
+  if (candidateBody.length <= META_BODY_LIMIT) {
+    return {
+      bodyText: candidateBody,
+      footerText: footer,
+      modified: true,
+      target: 'body',
+    }
+  }
+
+  // Último recurso: reemplazamos footer con sólo el disclosure (pierde su footer original)
+  return {
+    bodyText: body,
+    footerText: SUGGESTED_MARKETING_FOOTER,
+    modified: true,
+    target: 'footer',
+  }
+}

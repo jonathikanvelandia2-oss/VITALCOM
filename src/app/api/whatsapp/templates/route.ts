@@ -4,7 +4,7 @@ import { apiError, apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/db/prisma'
 import { WaTemplateCategory, WaTemplateStatus } from '@prisma/client'
-import { marketingTemplateHasOptOut } from '@/lib/whatsapp/opt-out'
+import { ensureMarketingOptOut } from '@/lib/whatsapp/opt-out'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,17 +73,21 @@ export const POST = withErrorHandler(async (req: Request) => {
   })
   if (!account) return apiError('Cuenta no encontrada', 404, 'NOT_FOUND')
 
-  // V30 — Meta exige mención de opt-out en plantillas MARKETING
+  // V30.1 — Meta exige opt-out en MARKETING. Auto-append si falta.
+  let finalBody = data.bodyText
+  let finalFooter = data.footerText
+  let optOutInjected = false
+  let optOutTarget: 'footer' | 'body' | 'none' = 'none'
+
   if (data.category === WaTemplateCategory.MARKETING) {
-    const combined = [data.bodyText, data.footerText ?? ''].join(' ')
-    if (!marketingTemplateHasOptOut(combined)) {
-      return apiError(
-        'Las plantillas MARKETING deben incluir cómo darse de baja. ' +
-          'Agrega algo como: "Responde STOP para no recibir más mensajes."',
-        400,
-        'MISSING_OPT_OUT',
-      )
-    }
+    const fixed = ensureMarketingOptOut({
+      bodyText: data.bodyText,
+      footerText: data.footerText,
+    })
+    finalBody = fixed.bodyText
+    finalFooter = fixed.footerText ?? undefined
+    optOutInjected = fixed.modified
+    optOutTarget = fixed.target
   }
 
   const template = await prisma.whatsappTemplate.create({
@@ -93,10 +97,10 @@ export const POST = withErrorHandler(async (req: Request) => {
       category: data.category as WaTemplateCategory,
       language: data.language,
       purpose: data.purpose,
-      bodyText: data.bodyText,
+      bodyText: finalBody,
       headerType: data.headerType,
       headerContent: data.headerContent,
-      footerText: data.footerText,
+      footerText: finalFooter,
       buttons: data.buttons as never,
       variables: data.variables as never,
       variantGroup: data.variantGroup,
@@ -106,5 +110,9 @@ export const POST = withErrorHandler(async (req: Request) => {
     },
   })
 
-  return apiSuccess({ id: template.id }, 201)
+  return apiSuccess({
+    id: template.id,
+    optOutInjected,
+    optOutTarget,
+  }, 201)
 })

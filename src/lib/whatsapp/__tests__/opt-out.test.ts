@@ -4,6 +4,7 @@ import {
   isOptOutMessage,
   isOptInMessage,
   marketingTemplateHasOptOut,
+  ensureMarketingOptOut,
   OPT_OUT_CONFIRMATION_TEXT,
   OPT_IN_CONFIRMATION_TEXT,
   SUGGESTED_MARKETING_FOOTER,
@@ -119,6 +120,83 @@ describe('marketingTemplateHasOptOut', () => {
 
   it('el footer sugerido por defecto cumple', () => {
     expect(marketingTemplateHasOptOut(SUGGESTED_MARKETING_FOOTER)).toBe(true)
+  })
+})
+
+describe('ensureMarketingOptOut', () => {
+  it('no modifica si body ya tiene STOP', () => {
+    const r = ensureMarketingOptOut({
+      bodyText: '20% off. Responde STOP para cancelar.',
+      footerText: 'Vitalcom',
+    })
+    expect(r.modified).toBe(false)
+    expect(r.target).toBe('none')
+    expect(r.bodyText).toBe('20% off. Responde STOP para cancelar.')
+    expect(r.footerText).toBe('Vitalcom')
+  })
+
+  it('no modifica si footer ya tiene unsubscribe', () => {
+    const r = ensureMarketingOptOut({
+      bodyText: 'Promo del día',
+      footerText: 'Reply unsubscribe to stop',
+    })
+    expect(r.modified).toBe(false)
+  })
+
+  it('agrega footer sugerido si no hay footer', () => {
+    const r = ensureMarketingOptOut({
+      bodyText: '20% off. Código PROMO.',
+      footerText: undefined,
+    })
+    expect(r.modified).toBe(true)
+    expect(r.target).toBe('footer')
+    expect(r.footerText).toBe(SUGGESTED_MARKETING_FOOTER)
+    expect(r.bodyText).toBe('20% off. Código PROMO.')
+  })
+
+  it('agrega footer sugerido si footerText es null', () => {
+    const r = ensureMarketingOptOut({
+      bodyText: 'Cuerpo',
+      footerText: null,
+    })
+    expect(r.modified).toBe(true)
+    expect(r.footerText).toBe(SUGGESTED_MARKETING_FOOTER)
+  })
+
+  it('concatena al footer existente si cabe', () => {
+    const r = ensureMarketingOptOut({
+      bodyText: 'Promo',
+      footerText: 'Vitalcom',
+    })
+    expect(r.modified).toBe(true)
+    expect(r.target).toBe('footer')
+    expect(r.footerText).toBe(`Vitalcom ${SUGGESTED_MARKETING_FOOTER}`)
+  })
+
+  it('si footer no admite más chars, va al body', () => {
+    const longFooter = 'A'.repeat(45) // 45 + 1 + 44(sugerido) = 90 > 60
+    const r = ensureMarketingOptOut({
+      bodyText: 'Cuerpo corto',
+      footerText: longFooter,
+    })
+    expect(r.modified).toBe(true)
+    expect(r.target).toBe('body')
+    expect(r.bodyText).toContain(SUGGESTED_MARKETING_FOOTER)
+    expect(r.footerText).toBe(longFooter)
+  })
+
+  it('garantiza que el resultado siempre pasa la validación', () => {
+    const inputs = [
+      { bodyText: 'promo', footerText: undefined },
+      { bodyText: 'promo', footerText: null },
+      { bodyText: 'promo', footerText: 'Vitalcom' },
+      { bodyText: 'promo ya con STOP', footerText: undefined },
+    ]
+    for (const input of inputs) {
+      const r = ensureMarketingOptOut(input)
+      const combined = [r.bodyText, r.footerText ?? ''].join(' ')
+      expect(marketingTemplateHasOptOut(combined)).toBe(true)
+    }
   })
 })
 

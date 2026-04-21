@@ -1,5 +1,29 @@
 # Vitalcom Platform — Changelog
 
+## [2.11.0] — 2026-04-21
+
+**Polish pre-producción — Opt-out auto-append + error boundaries segmentados.**
+
+Dos mejoras que cierran los pendientes del blueprint V30:
+
+### Opt-out auto-append en MARKETING
+Antes: crear una plantilla MARKETING sin disclosure devolvía 400 y bloqueaba al usuario. Ahora el servidor auto-agrega *"Responde STOP para no recibir más mensajes."* al footer, respetando los límites de Meta (footer ≤60 chars, body ≤1024). Fallback inteligente: si el footer ya no admite más, el disclosure va al body.
+
+- `src/lib/whatsapp/opt-out.ts` — nueva función `ensureMarketingOptOut()` con 3 estrategias: inyectar al footer vacío · concatenar al footer con espacio · fallback a body si no cabe
+- `src/app/api/whatsapp/templates/route.ts` — POST ya no rechaza; aplica auto-append y devuelve `{ optOutInjected, optOutTarget }` en el response
+- `src/app/admin/whatsapp/templates/page.tsx` — warning amarillo reemplazado por hint azul "Auto-opt-out activo"
+- 7 tests nuevos en `opt-out.test.ts` → **99/99 ✅**
+
+### Error boundaries segmentados
+Antes: un crash en `/admin/*` o `/(community)/*` rompía toda la app. Ahora cada segmento tiene su propio `error.tsx` con UI localizada (reintentar + volver al dashboard/feed).
+
+- `src/app/admin/error.tsx` — icono rojo `AlertOctagon` · ref code en mono · Reintentar + Dashboard
+- `src/app/(community)/error.tsx` — icono ámbar `AlertTriangle` · Reintentar + Volver al feed
+- `src/app/(auth)/error.tsx` — mensaje específico de autenticación + Ir al inicio
+- `src/app/admin/workflows/[id]/loading.tsx` — skeleton específico para canvas viewer
+
+**Resultado:** build limpio · typecheck sin errores · 99 tests ✅.
+
 ## [2.10.0] — 2026-04-21
 
 **Fase 10 — Suite de tests vitest sobre módulos críticos.**
