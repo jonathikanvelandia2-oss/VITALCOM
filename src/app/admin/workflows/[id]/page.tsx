@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState, useMemo, useEffect } from 'react'
+import { use, useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft, Loader2, Save, TestTube, CheckCircle2, XCircle, Clock,
@@ -29,16 +29,15 @@ export default function AdminWorkflowDetailPage(props: { params: Promise<{ id: s
 
   const workflow = workflowQ.data
 
-  // Cargar JSON inicial una vez que tenemos data
-  const initialSteps = useMemo(() => workflow?.steps ? JSON.stringify(workflow.steps, null, 2) : '', [workflow?.id])
-  const initialTrigger = useMemo(() => workflow?.triggerConfig ? JSON.stringify(workflow.triggerConfig, null, 2) : '', [workflow?.id])
-
+  // Cargar JSON inicial una vez que tenemos data. Usar workflow.id como key
+  // evita dependencias innecesarias que reescribirían el buffer del editor.
   useEffect(() => {
     if (workflow && !stepsJson) {
-      setStepsJson(initialSteps)
-      setTriggerJson(initialTrigger)
+      setStepsJson(JSON.stringify(workflow.steps, null, 2))
+      setTriggerJson(JSON.stringify(workflow.triggerConfig, null, 2))
     }
-  }, [workflow, initialSteps, initialTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflow?.id])
 
   const handleSave = async () => {
     setJsonError(null)

@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { startWorkflow } from '@/lib/flows/workflow-engine'
+import { rateLimitWebhook, getClientKey } from '@/lib/security/rate-limit-webhook'
 import { WaWorkflowTrigger } from '@prisma/client'
 import crypto from 'crypto'
 
@@ -27,6 +28,11 @@ function verifyShopifyHmac(rawBody: string, hmacHeader: string | null): boolean 
 }
 
 export async function POST(req: Request) {
+  const rate = rateLimitWebhook(getClientKey(req, 'shopify'))
+  if (!rate.allowed) {
+    return new NextResponse('Too many requests', { status: 429 })
+  }
+
   const rawBody = await req.text()
   const hmac = req.headers.get('x-shopify-hmac-sha256')
 

@@ -11,6 +11,7 @@ import { prisma } from '@/lib/db/prisma'
 import { verifyMetaSignature } from '@/lib/whatsapp/client'
 import { advanceOnReply, startWorkflow } from '@/lib/flows/workflow-engine'
 import { classify } from '@/lib/ai/intent-classifier'
+import { rateLimitWebhook, getClientKey } from '@/lib/security/rate-limit-webhook'
 import {
   WaMessageDirection, WaMessageStatus, WaMessageType,
   WaWorkflowTrigger,
@@ -42,6 +43,14 @@ export async function GET(req: Request) {
 
 // ─── POST: mensajes entrantes ───────────────────────────────
 export async function POST(req: Request) {
+  const rate = rateLimitWebhook(getClientKey(req, 'meta'))
+  if (!rate.allowed) {
+    return new NextResponse('Too many requests', {
+      status: 429,
+      headers: { 'Retry-After': String(Math.ceil((rate.resetAt - Date.now()) / 1000)) },
+    })
+  }
+
   const rawBody = await req.text()
   const signature = req.headers.get('x-hub-signature-256')
 

@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { startWorkflow } from '@/lib/flows/workflow-engine'
+import { rateLimitWebhook, getClientKey } from '@/lib/security/rate-limit-webhook'
 import { WaWorkflowTrigger } from '@prisma/client'
 import crypto from 'crypto'
 
@@ -24,6 +25,11 @@ function verifyEffiSignature(rawBody: string, sigHeader: string | null): boolean
 }
 
 export async function POST(req: Request) {
+  const rate = rateLimitWebhook(getClientKey(req, 'effi'))
+  if (!rate.allowed) {
+    return new NextResponse('Too many requests', { status: 429 })
+  }
+
   const rawBody = await req.text()
   const sig = req.headers.get('x-effi-signature')
 

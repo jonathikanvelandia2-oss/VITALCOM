@@ -13,7 +13,7 @@
 
 import { prisma } from '@/lib/db/prisma'
 import { MemoryKind } from '@prisma/client'
-import { route } from './llm-router'
+import { route, embed, cosine, EMBEDDINGS_ENABLED } from './llm-router'
 
 export interface MemoryItem {
   id: string
@@ -40,9 +40,10 @@ export async function getRecentMessages(
   }))
 }
 
-// ─── Memoria larga — sin embeddings (V26) ──────────────────
-// En V26 recuperamos las memorias más importantes y recientes,
-// filtrando por keywords simples. Es un fallback razonable.
+// ─── Memoria larga — V28 con embeddings opcionales ─────────
+// Si EMBEDDINGS_ENABLED: embebe la query y rankea por cosine
+// similarity con las memorias que tengan embedding. Las que no
+// tienen, usan el scoring keyword+importance (fallback V26).
 export async function recallRelevantMemories(
   userId: string,
   query: string,
@@ -55,17 +56,38 @@ export async function recallRelevantMemories(
     where: { userId, expiresAt: { not: null, lt: now } },
   }).catch(() => {})
 
-  const queryLower = query.toLowerCase()
-  // Keywords de relevancia por kind
-  const relevanceKeywords = queryLower.split(/\s+/).filter(w => w.length > 3)
-
   const memories = await prisma.userMemory.findMany({
     where: { userId },
     orderBy: [{ importance: 'desc' }, { updatedAt: 'desc' }],
-    take: 20,
+    take: 40,
   })
 
-  // Scoring: importance + match keywords
+  if (memories.length === 0) return []
+
+  // Ruta 1: embeddings (mejor ranking semántico)
+  if (EMBEDDINGS_ENABLED && memories.some(m => m.embedding)) {
+    try {
+      const queryEmbed = await embed(query)
+      const scored = memories.map(m => {
+        const embArr = Array.isArray(m.embedding) ? (m.embedding as number[]) : null
+        const sim = embArr ? cosine(queryEmbed, embArr) : 0
+        // Blend: 70% similitud + 30% importance
+        const score = sim * 0.7 + m.importance * 0.3
+        return { memory: m, score }
+      })
+      return scored
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map(s => toMemoryItem(s.memory))
+    } catch (err) {
+      console.warn('[user-memory] embedding recall failed, fallback:', (err as Error).message)
+    }
+  }
+
+  // Ruta 2: keyword + importance (fallback V26)
+  const queryLower = query.toLowerCase()
+  const relevanceKeywords = queryLower.split(/\s+/).filter(w => w.length > 3)
+
   const scored = memories.map(m => {
     const contentLower = m.content.toLowerCase()
     const keywordMatches = relevanceKeywords.filter(kw => contentLower.includes(kw)).length
@@ -76,13 +98,17 @@ export async function recallRelevantMemories(
   return scored
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
-    .map(s => ({
-      id: s.memory.id,
-      kind: s.memory.kind,
-      content: s.memory.content,
-      importance: s.memory.importance,
-      createdAt: s.memory.createdAt,
-    }))
+    .map(s => toMemoryItem(s.memory))
+}
+
+function toMemoryItem(m: { id: string; kind: MemoryKind; content: string; importance: number; createdAt: Date }): MemoryItem {
+  return {
+    id: m.id,
+    kind: m.kind,
+    content: m.content,
+    importance: m.importance,
+    createdAt: m.createdAt,
+  }
 }
 
 // ─── Guardar fact con dedup por content exacto ─────────────
@@ -119,11 +145,22 @@ export async function rememberFact(params: {
     return
   }
 
+  // V28 — si embeddings están habilitados, embeber al guardar (async, no bloquear)
+  let embedding: number[] | null = null
+  if (EMBEDDINGS_ENABLED) {
+    try {
+      embedding = await embed(params.content)
+    } catch {
+      embedding = null
+    }
+  }
+
   await prisma.userMemory.create({
     data: {
       userId: params.userId,
       kind: params.kind,
       content: params.content.slice(0, 500),
+      embedding: (embedding ?? undefined) as never,
       importance: params.importance ?? 0.5,
       sourceThreadId: params.sourceThreadId,
       expiresAt,

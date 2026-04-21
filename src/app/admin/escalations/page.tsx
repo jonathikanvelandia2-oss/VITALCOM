@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import {
   AlertCircle, CheckCircle2, Clock, Loader2, Send, User as UserIcon, Bot,
   ShieldAlert, MessageSquare, X,
@@ -241,11 +241,12 @@ function DetailPanel({ ticketId, onClose }: { ticketId: string; onClose: () => v
   }
 
   // Al abrir, pre-cargar draftResponse si existe
-  useMemo(() => {
+  useEffect(() => {
     if (ticket?.draftResponse && !replyToUser) {
       setReplyToUser(ticket.draftResponse)
     }
-  }, [ticket?.draftResponse]) // eslint-disable-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticket?.id])
 
   if (!ticket) {
     return (

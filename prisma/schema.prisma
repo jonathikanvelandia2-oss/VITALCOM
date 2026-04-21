@@ -1268,15 +1268,17 @@ enum MemoryKind {
   WARNING // Algo a evitar en su contexto
 }
 
-// Memoria estructurada del usuario. En V26 sin embeddings (búsqueda por kind
-// + fecha + importance). En V28 se agrega columna embedding vector(1536) para
-// recuperación semántica.
+// Memoria estructurada del usuario. En V28 se añade embedding como Json
+// (array de 1536 floats de text-embedding-3-small) para búsqueda semántica
+// in-memory sin necesidad de pgvector. Si embedding es null, fallback a
+// filtro por keyword+importance (modo V26).
 model UserMemory {
   id             String     @id @default(cuid())
   userId         String
   user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   kind           MemoryKind
   content        String // Max ~280 chars idealmente
+  embedding      Json? // V28 — array 1536 floats, opcional
   importance     Float      @default(0.5) // 0..1 — decae con el tiempo
   sourceThreadId String? // Thread origen (no FK para no bloquear cleanup)
   expiresAt      DateTime? // Null = permanente
@@ -1349,6 +1351,8 @@ model SemanticCache {
   userId    String? // Opcional — null = respuesta "canónica" compartible
   agentName ChatAgent
   query     String // Query original (para debugging)
+  embedding Json? // V28 — array de floats opcional para match semántico cross-user (solo canónicas)
+  isCanonical Boolean @default(false) // V28 — true = respuesta sin datos personales, matcheable semántico entre usuarios
   response  String
   hits      Int       @default(0)
   lastHitAt DateTime  @default(now())
@@ -1357,6 +1361,7 @@ model SemanticCache {
 
   @@index([agentName, expiresAt])
   @@index([userId])
+  @@index([agentName, isCanonical, expiresAt])
 }
 
 // ─────────────────────────────────────────────────────────
