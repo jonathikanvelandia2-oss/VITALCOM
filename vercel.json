@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/bots?bot=MORNING_BRIEF_BOT",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/flows/cron",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

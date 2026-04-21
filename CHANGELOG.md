@@ -1,5 +1,88 @@
 # Vitalcom Platform — Changelog
 
+## [2.5.0] — 2026-04-21
+
+**V27 WhatsApp Commerce Foundation — Workflow Engine + 6 flujos pre-built + webhooks.**
+
+Segundo entregable del blueprint V21. Se implementa la foundation completa de WhatsApp Business Cloud API con un workflow engine adaptativo que **supera a Lucidbot** en todos los frentes: intent semántico vs keywords, timings adaptativos, ramas AI, respuestas libres en medio del flujo, escalación invisible a humano.
+
+**Decisión clave — Modo MOCK:**
+- Sin credenciales Meta/Shopify/Effi (pendientes CEO), el sistema opera en modo MOCK: loguea envíos en consola + persiste todo en BD.
+- Cuando lleguen credenciales, se setea `WHATSAPP_MOCK_MODE=false` + secrets en env y el pipeline completo empieza a operar en producción sin cambios de código.
+- Webhooks con validación HMAC real (Meta SHA256, Shopify base64 SHA256, Effi SHA256 hex) desde ya — zero bypass en producción.
+
+### V27 — WhatsApp Commerce Foundation (`this release`)
+
+**Schema Prisma (11 modelos + 9 enums nuevos):**
+- `WhatsappAccount` (multi-tienda, phoneNumberId único, quality Green/Yellow/Red, webhookVerifyToken)
+- `WhatsappTemplate` (Meta templates con `fallbackTemplateId` para chain automática + contadores Sent/Opened/Clicked/Blocked)
+- `WhatsappContact` (perfil extendido: LTV, confirmationRate, avgResponseMinutes, segment, tags JSON, `lastUserMessageAt` para ventana 24h)
+- `WhatsappConversation` con `aiThreadId` puente al chat universal V26
+- `WhatsappMessage` con direction/type/intent/sentiment/status + `metaMessageId @unique` para dedup
+- `WaWorkflow` (prefijo Wa para no colisionar con WorkflowTemplate de Luzitbot) — steps JSON + triggerType + métricas + confidenceScore
+- `WaExecution` + `WaStepRun` (audit trail completo de cada paso)
+- `WhatsappOrderLink` con `confirmationStatus` (HOT/BOT/AGENT/NOT_CONFIRMED) + tracking Effi
+- `AbandonedCart` con `expiresAt` 72h
+- `HotButtonEvent` tracking del snippet Shopify (view/click/dismiss + A/B variant)
+- `WebhookEvent` dedup por `(source, externalId)` — idempotencia de Shopify/Effi
+
+**Librerías nuevas:**
+- `src/lib/whatsapp/client.ts` — 4 funciones (sendTemplate/sendText/sendInteractive/sendMedia) con fallback chain de plantillas, retry exponencial, HMAC verification, pre-persistencia QUEUED → SENT para idempotencia
+- `src/lib/flows/workflow-engine.ts` — 14 step types (send_template/text/interactive/media, wait, wait_for_reply, branch, tag, ai_decision, ai_respond, update_contact, create_order_link, call_webhook, escalate, end), wake-up cron, adaptatividad por segment/confirmationRate, integración con escalate V26
+- `src/lib/flows/prebuilt-workflows.ts` — 6 flujos completos listos para instalar
+
+**Los 6 workflows pre-built:**
+1. `hot_confirmation` — botón caliente Shopify → tag + update segment + template confirmado
+2. `auto_confirmation` — pedido nuevo → 15min adaptativos → template → 180min reply → ai_decision 5 ramas (confirm/cancel/edit/question/no_reply) → reintento 24h → fallback UTILITY 48h
+3. `abandoned_cart` — checkout abandonado 30min → template → 240min adaptativos → interactive 3 botones → ai_decision → ai_respond
+4. `shipped` — Effi guide_generated → template guia_generada con tracking + actualiza segment
+5. `remarketing` — 20 días post-entrega → template → ai_decision (buy_again/question/not_interested)
+6. `delivery_issue` — Effi delivery_exception → template novedad → ai_decision → webhook Effi retry o escalate logística
+
+**APIs:**
+- `GET /api/workflows` (list con filtro accountId) · `POST /api/workflows` (crear) · `GET/PATCH/DELETE /api/workflows/[id]`
+- `POST /api/workflows/install-prebuilt` (instala los 6 en una cuenta, dedup por purpose)
+- `POST /api/workflows/[id]/test` (ejecutar manualmente con phoneE164 o contactId)
+- `GET/POST /api/whatsapp/accounts`
+- `GET/POST /api/flows/cron` (procesa wake-ups con CRON_SECRET)
+- Webhooks: `GET /api/webhooks/whatsapp` (Meta verification) + `POST` (mensajes + delivery receipts)
+- `POST /api/webhooks/shopify` (orders/create + checkouts/update) con HMAC Shopify
+- `POST /api/webhooks/effi` (guide_generated/delivery_exception/delivered) con HMAC
+
+**Hooks React Query:**
+- `useWaWorkflows` (refetch 30s) / `useWaWorkflow` / `useUpdateWaWorkflow` / `useDeleteWaWorkflow` / `useTestWaWorkflow` / `useInstallPrebuilt`
+- `useWhatsappAccounts` / `useCreateWhatsappAccount`
+
+**UI admin:**
+- `/admin/workflows` — lista con filtro por cuenta, toggle activo, stats (ejecuciones/éxito/confianza), botón "Instalar 6 pre-built"
+- `/admin/workflows/[id]` — editor JSON de steps + triggerConfig, panel lateral con test manual + métricas + últimas 10 ejecuciones
+- `/admin/whatsapp` — formulario de conexión + lista de cuentas con webhook URL y verify token copiables + alerta blocker Meta
+
+**Integraciones transversales:**
+- `stepEscalate` invoca `createEscalationTicket` V26 + crea `ConversationThread` puente si no existe → ticket aparece en `/admin/escalations`
+- `stepAiDecision` + `stepAiRespond` usan `route()` del LLM router V26 (sin Claude todavía)
+- `advanceOnReply()` adelanta wake-ups del workflow cuando el contacto responde antes del timeout
+- Sidebar admin: Workflows WA + Cuentas WhatsApp con badge NEW
+- `vercel.json` +1 cron `*/5 * * * *` para wake-ups (7 crons total)
+
+**Mejoras clave vs blueprint original aplicadas:**
+- Prisma singleton (no `new PrismaClient()` en 7 archivos)
+- HMAC SHA256 validación real en los 3 webhooks (blueprint no la tenía en POST)
+- Idempotencia de webhooks Shopify/Effi por `(source, externalId)` tabla WebhookEvent
+- Pre-persistencia WhatsappMessage QUEUED → SENT para evitar doble envío si crash mid-flight
+- Dedup Meta por `metaMessageId @unique`
+- Modo MOCK por flag env → permite shipping sin blocker externo
+- TypeScript estricto (Zod) en create/patch workflow
+
+**Pendiente V28 (F3) y V29:**
+- V28: pgvector + cache semántico capa 2 + memoria larga semántica + Claude Haiku router
+- V29: Shopify snippet production (requiere OAuth), canvas SVG drag-drop del editor, A/B test automático de templates, broadcast segmentado
+- Blockers CEO: Meta Business App + WABA verificada + review permissions, Shopify Partner OAuth, Dropi API prod, Resend DNS
+
+Diferenciador: Vitalcom es la **única plataforma LATAM** con workflow engine IA para WhatsApp Commerce que supera Lucidbot en 12 dimensiones (intent semántico, timings adaptativos, ramas AI, multimodal, multi-tienda, memoria cliente, aprendizaje, fallback templates, escalación invisible, carritos automáticos, editor abierto).
+
+---
+
 ## [2.4.0] — 2026-04-21
 
 **V26 VITA Chat Universal IA — Orchestrator + Persona + P&G + Escalación.**

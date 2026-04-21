@@ -145,6 +145,9 @@ model User {
   userMemories            UserMemory[]
   escalationTickets       EscalationTicket[]       @relation("EscalationUser")
   escalationAssigned      EscalationTicket[]       @relation("EscalationAssignee")
+  // V27 — WhatsApp Commerce
+  whatsappAccounts        WhatsappAccount[]
+  waWorkflows             WaWorkflow[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1354,4 +1357,412 @@ model SemanticCache {
 
   @@index([agentName, expiresAt])
   @@index([userId])
+}
+
+// ─────────────────────────────────────────────────────────
+// V27 — WHATSAPP COMMERCE + WORKFLOW ENGINE
+// ─────────────────────────────────────────────────────────
+// Foundation para operar WhatsApp Business Cloud API con
+// workflows adaptativos (mejora Lucidbot). En V27 funciona en
+// MODO MOCK (sin credenciales externas) — guarda mensajes en
+// BD y el engine ejecuta todo el pipeline igual. Cuando lleguen
+// credenciales CEO (Meta Business App + WABA + tokens), solo se
+// cambia WHATSAPP_MOCK_MODE=false y el cliente llama la API real.
+
+enum WaAccountQuality {
+  GREEN
+  YELLOW
+  RED
+  UNKNOWN
+}
+
+enum WaAccountTier {
+  TIER_250
+  TIER_1K
+  TIER_10K
+  TIER_100K
+  UNLIMITED
+}
+
+enum WaMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum WaMessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  DOCUMENT
+  TEMPLATE
+  INTERACTIVE
+  BUTTON
+  LOCATION
+  CONTACTS
+  STICKER
+}
+
+enum WaMessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  BLOCKED
+}
+
+enum WaTemplateCategory {
+  UTILITY
+  MARKETING
+  AUTHENTICATION
+}
+
+enum WaTemplateStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  DISABLED
+}
+
+enum WaWorkflowStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WaWorkflowTrigger {
+  ORDER_CREATED
+  MESSAGE_RECEIVED
+  NO_RESPONSE
+  SCHEDULE
+  WEBHOOK
+  MANUAL
+}
+
+enum WaOrderConfirmStatus {
+  PENDING
+  CONFIRMED_HOT // Botón caliente Shopify
+  CONFIRMED_BOT // Confirmó por mensaje al bot
+  CONFIRMED_AGENT // Confirmó por agente humano
+  NOT_CONFIRMED // Timeout total
+  CANCELLED
+}
+
+// Cuenta WhatsApp Business Cloud API — un VITALCOMMER puede tener N
+model WhatsappAccount {
+  id                 String           @id @default(cuid())
+  userId             String
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String // "Caramela Beauty"
+  phoneNumberId      String           @unique // Meta phone number ID
+  wabaId             String // WhatsApp Business Account ID
+  displayPhone       String // "+57 300 123 4567"
+  accessToken        String // Cifrado en app (V28)
+  webhookVerifyToken String
+  // Estado Meta
+  quality            WaAccountQuality @default(UNKNOWN)
+  messagingLimit     WaAccountTier?
+  isActive           Boolean          @default(true)
+  // Branding
+  logoUrl            String?
+  businessName       String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  templates     WhatsappTemplate[]
+  conversations WhatsappConversation[]
+  contacts      WhatsappContact[]
+  workflows     WaWorkflow[]
+
+  @@index([userId])
+}
+
+// Plantillas aprobadas por Meta
+model WhatsappTemplate {
+  id                 String             @id @default(cuid())
+  accountId          String
+  account            WhatsappAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  metaName           String // "confirmacion"
+  category           WaTemplateCategory
+  language           String // "es_CO", "en"
+  // Contenido
+  headerType         String? // NONE | TEXT | IMAGE | VIDEO | DOCUMENT
+  headerContent      String?
+  bodyText           String
+  footerText         String?
+  buttons            Json? // [{type, text, url?}]
+  variables          Json?
+  // Estado Meta
+  status             WaTemplateStatus   @default(DRAFT)
+  metaTemplateId     String?
+  rejectionReason    String?
+  // Performance
+  timesSent          Int                @default(0)
+  timesOpened        Int                @default(0)
+  timesClicked       Int                @default(0)
+  timesBlocked       Int                @default(0)
+  // Fallback chain — mejora Lucidbot
+  fallbackTemplateId String?
+  // Propósito lógico
+  purpose            String // confirmation | retry | abandoned_cart | etc
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([accountId, metaName, language])
+  @@index([accountId, purpose])
+}
+
+// Contacto — perfil extendido del comprador
+model WhatsappContact {
+  id                  String          @id @default(cuid())
+  accountId           String
+  account             WhatsappAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  phoneE164           String // +573001234567
+  firstName           String?
+  lastName            String?
+  email               String?
+  shippingAddress     String?
+  shippingCity        String?
+  shippingState       String?
+  shippingCountry     String? // CO | EC | GT | CL
+  // Scoring
+  lifetimeValue       Float           @default(0)
+  orderCount          Int             @default(0)
+  confirmationRate    Float? // 0..1
+  cancellationRate    Float?
+  deliverySuccessRate Float?
+  avgResponseMinutes  Int?
+  // Tags como JSON con metadata
+  tags                Json            @default("[]")
+  segment             String? // hot_lead | repeat_buyer | at_risk | cancelador | vip
+  // Estado
+  isOptedIn           Boolean         @default(true)
+  lastInteractionAt   DateTime?
+  lastConversationId  String?
+  // Ventana 24h (regla WhatsApp Business)
+  lastUserMessageAt   DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  conversations WhatsappConversation[]
+  orders        WhatsappOrderLink[]
+
+  @@unique([accountId, phoneE164])
+  @@index([accountId, segment])
+}
+
+model WhatsappConversation {
+  id                 String          @id @default(cuid())
+  accountId          String
+  account            WhatsappAccount @relation(fields: [accountId], references: [id])
+  contactId          String
+  contact            WhatsappContact @relation(fields: [contactId], references: [id])
+  // Puente al chat universal V26
+  aiThreadId         String?
+  metaConversationId String?
+  status             String          @default("active") // active | archived | blocked
+  windowExpiresAt    DateTime?
+  orderId            String?
+  // Métricas
+  messagesIn         Int             @default(0)
+  messagesOut        Int             @default(0)
+  costUsd            Float           @default(0)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  messages WhatsappMessage[]
+
+  @@index([accountId, status])
+  @@index([contactId])
+}
+
+model WhatsappMessage {
+  id                String               @id @default(cuid())
+  conversationId    String
+  conversation      WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  metaMessageId     String?              @unique
+  direction         WaMessageDirection
+  type              WaMessageType
+  content           String?
+  mediaUrl          String?
+  mediaUploadId     String? // Link a MediaUpload multimodal (V28)
+  templateId        String?
+  templateVariables Json?
+  status            WaMessageStatus      @default(QUEUED)
+  failureReason     String?
+  // Interacción
+  buttonReplyId     String?
+  buttonReplyTitle  String?
+  // Meta-contexto IA
+  intent            String? // confirm | cancel | question | ...
+  sentiment         String? // positive | neutral | negative | frustrated
+  // Timing
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  createdAt         DateTime             @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([metaMessageId])
+}
+
+// Workflow adaptativo con IA — motor Vitalcom
+// Prefijo Wa para evitar colisión con WorkflowTemplate (Luzitbot chatflows)
+model WaWorkflow {
+  id                 String            @id @default(cuid())
+  userId             String
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId          String?
+  account            WhatsappAccount?  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  // Identidad
+  name               String
+  purpose            String // order_confirmation | abandoned_cart | delivery | reactivation
+  isActive           Boolean           @default(true)
+  // Trigger
+  triggerType        WaWorkflowTrigger
+  triggerConfig      Json
+  // Steps — JSON con nodos
+  steps              Json // WorkflowStep[]
+  // IA
+  useAiAdaptation    Boolean           @default(true)
+  usePersonalization Boolean           @default(true)
+  // Métricas
+  timesExecuted      Int               @default(0)
+  successCount       Int               @default(0)
+  failCount          Int               @default(0)
+  avgDurationMin     Float?
+  confidenceScore    Float             @default(0.5)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  executions WaExecution[]
+
+  @@index([userId, isActive])
+  @@index([accountId, purpose])
+}
+
+model WaExecution {
+  id             String           @id @default(cuid())
+  workflowId     String
+  workflow       WaWorkflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  contactId      String?
+  conversationId String?
+  orderId        String?
+  // Estado
+  status         WaWorkflowStatus @default(RUNNING)
+  currentStepId  String?
+  context        Json             @default("{}")
+  // Outcome
+  outcomeType    String? // positive | negative | neutral | timeout
+  outcomeDetail  String?
+  // Timing
+  startedAt      DateTime         @default(now())
+  completedAt    DateTime?
+  nextWakeupAt   DateTime?
+
+  stepRuns WaStepRun[]
+
+  @@index([workflowId, status])
+  @@index([nextWakeupAt])
+  @@index([contactId])
+  @@index([orderId])
+}
+
+model WaStepRun {
+  id           String      @id @default(cuid())
+  executionId  String
+  execution    WaExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  stepId       String
+  stepType     String
+  status       String // success | failed | skipped
+  input        Json?
+  output       Json?
+  startedAt    DateTime    @default(now())
+  finishedAt   DateTime?
+  durationMs   Int?
+  errorMessage String?
+
+  @@index([executionId])
+}
+
+// Link pedido ↔ contacto WhatsApp (con tracking de confirmación)
+model WhatsappOrderLink {
+  id                  String               @id @default(cuid())
+  orderId             String               @unique
+  contactId           String
+  contact             WhatsappContact      @relation(fields: [contactId], references: [id])
+  confirmationStatus  WaOrderConfirmStatus @default(PENDING)
+  confirmedAt         DateTime?
+  confirmationChannel String? // hot_button | bot_reply | bot_after_retries | human_agent
+  // Fulfillment
+  fulfillmentId       String?
+  trackingNumber      String?
+  carrier             String?
+  shippedAt           DateTime?
+  deliveredAt         DateTime?
+  returnedAt          DateTime?
+  returnReason        String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([contactId])
+  @@index([confirmationStatus])
+}
+
+model AbandonedCart {
+  id                   String    @id @default(cuid())
+  accountId            String
+  contactId            String?
+  phoneE164            String?
+  firstName            String?
+  // Datos del carrito
+  shopifyCartId        String?   @unique
+  checkoutUrl          String
+  items                Json // [{productId, name, quantity, price}]
+  totalValue           Float
+  currency             String
+  status               String    @default("abandoned") // abandoned | recovered | expired
+  recoveredAt          DateTime?
+  // Acciones
+  recoveryMessagesSent Int       @default(0)
+  lastMessageAt        DateTime?
+  abandonedAt          DateTime  @default(now())
+  expiresAt            DateTime
+
+  @@index([accountId, status])
+  @@index([phoneE164])
+}
+
+// Hot-button del snippet Shopify (tracking de clicks + A/B test)
+model HotButtonEvent {
+  id          String   @id @default(cuid())
+  shopDomain  String
+  orderId     String?
+  orderNumber String?
+  phoneE164   String?
+  // Tracking
+  eventType   String // view | click | dismiss
+  variant     String? // A | B (para A/B test del copy)
+  userAgent   String?
+  referrer    String?
+  createdAt   DateTime @default(now())
+
+  @@index([shopDomain, createdAt])
+  @@index([orderId])
+}
+
+// Dedup de webhooks externos (Shopify/Effi) por eventId
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  source      String // shopify | effi | meta
+  externalId  String // x-shopify-webhook-id, effi event_id, meta message_id
+  topic       String? // orders/create, checkouts/update, guide_generated
+  processedAt DateTime @default(now())
+  payloadSha  String? // sha256 del body para verificación
+
+  @@unique([source, externalId])
+  @@index([source, processedAt])
 }
