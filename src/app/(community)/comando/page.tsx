@@ -15,6 +15,7 @@ import {
   type UnifiedAction,
   type ActionSource,
 } from '@/hooks/useCommandCenter'
+import { useCurrentGoal } from '@/hooks/useGoals'
 
 // ── Command Center IA — War Room del dropshipper ─────────
 // Feed unificado de acciones priorizadas cross-agentes + KPIs del negocio.
@@ -77,6 +78,7 @@ export default function CommandCenterPage() {
 
   const dataQ = useCommandCenter()
   const refreshMut = useRefreshCommandCenter()
+  const goalQ = useCurrentGoal()
 
   const data = dataQ.data
   const actions = data?.actions ?? []
@@ -177,6 +179,115 @@ export default function CommandCenterPage() {
       </div>
 
       <div className="mx-auto max-w-7xl px-6 py-6">
+        {/* Banner de meta mensual */}
+        {goalQ.data?.goal && (
+          <Link
+            href="/metas"
+            className="mb-4 block rounded-xl p-4 transition-all hover:translate-x-0.5"
+            style={{
+              background:
+                goalQ.data.isOnTrack || goalQ.data.progressPct.revenue >= 100
+                  ? 'linear-gradient(90deg, rgba(198,255,60,0.12), rgba(198,255,60,0.04))'
+                  : 'linear-gradient(90deg, rgba(255,184,0,0.10), rgba(255,184,0,0.03))',
+              border: `1px solid ${
+                goalQ.data.isOnTrack || goalQ.data.progressPct.revenue >= 100
+                  ? 'rgba(198,255,60,0.35)'
+                  : 'rgba(255,184,0,0.35)'
+              }`,
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                style={{
+                  background:
+                    goalQ.data.progressPct.revenue >= 100
+                      ? 'var(--vc-gradient-primary)'
+                      : 'var(--vc-black-soft)',
+                }}
+              >
+                <Target
+                  size={15}
+                  style={{
+                    color:
+                      goalQ.data.progressPct.revenue >= 100
+                        ? 'var(--vc-black)'
+                        : goalQ.data.isOnTrack
+                          ? 'var(--vc-lime-main)'
+                          : '#FFB800',
+                  }}
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center gap-2">
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-wider"
+                    style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}
+                  >
+                    Meta de {goalQ.data.goal.month}/{goalQ.data.goal.year}
+                  </span>
+                  <span
+                    className="text-[11px] font-bold"
+                    style={{
+                      color:
+                        goalQ.data.progressPct.revenue >= 100
+                          ? 'var(--vc-lime-main)'
+                          : goalQ.data.isOnTrack
+                            ? 'var(--vc-lime-main)'
+                            : '#FFB800',
+                      fontFamily: 'var(--font-mono)',
+                    }}
+                  >
+                    {goalQ.data.progressPct.revenue}%
+                  </span>
+                </div>
+                <div
+                  className="h-1.5 overflow-hidden rounded-full"
+                  style={{ background: 'var(--vc-gray-dark)' }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, goalQ.data.progressPct.revenue)}%`,
+                      background: 'var(--vc-gradient-primary)',
+                    }}
+                  />
+                </div>
+              </div>
+              <ArrowRight size={14} style={{ color: 'var(--vc-lime-main)' }} />
+            </div>
+          </Link>
+        )}
+
+        {/* Banner set-goal si no tiene meta */}
+        {goalQ.data && !goalQ.data.goal && (
+          <Link
+            href="/metas"
+            className="mb-4 flex items-center justify-between rounded-xl px-4 py-3 transition-all hover:translate-x-0.5"
+            style={{
+              background:
+                'linear-gradient(90deg, rgba(198,255,60,0.08), rgba(60,198,255,0.05))',
+              border: '1px dashed rgba(198,255,60,0.3)',
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <Target size={16} style={{ color: 'var(--vc-lime-main)' }} />
+              <div>
+                <p
+                  className="text-[11px] font-bold uppercase tracking-wider"
+                  style={{ color: 'var(--vc-lime-main)', fontFamily: 'var(--font-mono)' }}
+                >
+                  Define tu meta mensual
+                </p>
+                <p className="text-[12px]" style={{ color: 'var(--vc-white-dim)' }}>
+                  Los dropshippers con meta venden 2.3x más. Define la tuya en 30s.
+                </p>
+              </div>
+            </div>
+            <ArrowRight size={14} style={{ color: 'var(--vc-lime-main)' }} />
+          </Link>
+        )}
+
         {/* Banner cross-link a Impacto IA */}
         <Link
           href="/impacto"

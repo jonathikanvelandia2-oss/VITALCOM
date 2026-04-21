@@ -139,6 +139,7 @@ model User {
   adCreatives      AdCreative[]
   storeOptimizations StoreOptimization[]
   appliedActions   AppliedAction[]
+  goals            UserGoal[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1109,4 +1110,50 @@ model BotRun {
 
   @@index([bot, startedAt])
   @@index([status, startedAt])
+}
+
+// ─────────────────────────────────────────────────────────
+// METAS MENSUALES (V24) — Objetivos de revenue/orders por mes
+// ─────────────────────────────────────────────────────────
+// El dropshipper define su meta mensual. El Command Center
+// re-prioriza acciones IA según la brecha entre progreso actual
+// y meta. Celebración automática al alcanzar 100%.
+
+enum GoalStatus {
+  ACTIVE
+  ACHIEVED
+  MISSED        // Mes cerrado sin alcanzar
+  ARCHIVED
+}
+
+model UserGoal {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Ventana mensual (primer día del mes en UTC)
+  year           Int
+  month          Int                          // 1-12
+
+  // Metas
+  targetRevenue  Float                         // COP
+  targetOrders   Int?                          // opcional
+  targetMargin   Float?                        // % opcional
+  stretchRevenue Float?                        // meta "estiramiento"
+
+  // Tracking del cierre (se llena al finalizar el mes)
+  achievedRevenue Float?
+  achievedOrders  Int?
+  achievedMargin  Float?
+  status          GoalStatus @default(ACTIVE)
+  achievedAt      DateTime?
+
+  // Celebración (para evitar re-disparar)
+  celebrationSent Boolean    @default(false)
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([userId, year, month])
+  @@index([userId, status])
 }

@@ -46,7 +46,8 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/comando', label: 'Command Center', icon: Command },
       { href: '/impacto', label: 'Impacto IA', icon: LineChart },
-      { href: '/soporte', label: 'SoporteIA', icon: LifeBuoy, badge: 'NEW' },
+      { href: '/metas', label: 'Mi Meta', icon: Target, badge: 'NEW' },
+      { href: '/soporte', label: 'SoporteIA', icon: LifeBuoy },
       { href: '/mi-tienda', label: 'Mi Tienda', icon: ShoppingBag, badge: '3' },
       { href: '/pedidos', label: 'Mis Pedidos', icon: ShoppingCart },
       { href: '/mi-pyg', label: 'Mi P&G', icon: Wallet },

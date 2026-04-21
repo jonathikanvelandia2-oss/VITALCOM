@@ -1,5 +1,30 @@
 # Vitalcom Platform — Changelog
 
+## [2.2.0] — 2026-04-21
+
+**V24 Metas mensuales + Benchmarks anónimos de la comunidad.**
+
+Cierra M2 y M3 del plan de mejoras CEO. Crea hábito + motivación + FOMO saludable. 100% alineado con el principio "comunidad sin ánimo de lucro": 0 cobro, solo valor.
+
+### V24 — Metas + Benchmarks (`this release`)
+- **Schema `UserGoal`**: meta mensual con targetRevenue + opcional targetOrders/Margin/stretchRevenue. Unique por (userId, year, month). Status ACTIVE/ACHIEVED/MISSED/ARCHIVED
+- **Helper `getCurrentMonthProgress`**: calcula revenue/orders/margin del mes, proyección lineal end-of-month, días transcurridos/restantes, isOnTrack, dailyRateToHit, needsPerDayIncrease
+- **Helper `computeBenchmarks`**: percentiles anónimos de la comunidad en 4 métricas (revenue30d, orders30d, marginPct, roas). Rankea al usuario en top_10/top_25/top_50/below_50 + índice 0-100. Sample size incluido
+- **3 APIs**: `GET /api/goals/current`, `POST /api/goals`, `GET /api/benchmarks`. Zod schema valida meta mínima 100k COP
+- **2 hooks**: `useCurrentGoal` (refetch 5min) + `useSetGoal` + `useBenchmarks` (refetch 10min)
+- **UI `/metas`**:
+  - Estado vacío con CTA "DEFINIR META"
+  - Card de edición con campos guiados (target, stretch, orders)
+  - Card de progreso con: progress bar grande, celebración al 100%, 4 stats (días, proyección, ritmo requerido, pedidos), insight textual según onTrack
+  - Sección benchmarks con 4 cards: user value + badge de rank (Top 10% / 25% / 50% / below) + mediana + top 10% comunidad + sample size
+  - Nota de privacidad: solo agregados, 0 datos personales
+- **Command Center integrado**: banner de meta en top con progress bar 1.5px o CTA "Define tu meta mensual" si no tiene
+- **Sidebar**: "Mi Meta" con icon Target + badge NEW
+
+Diferenciador: Vitalcom es **la única plataforma LATAM** que muestra al dropshipper dónde está vs el resto de la comunidad. Única razón: somos proveedor + plataforma + comunidad en uno. Nadie más tiene esa data agregada.
+
+---
+
 ## [2.1.0] — 2026-04-21
 
 **V23 Bots autónomos · Vercel Cron operativo.**
