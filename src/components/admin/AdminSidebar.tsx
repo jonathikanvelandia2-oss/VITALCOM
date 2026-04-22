@@ -62,6 +62,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: '/admin/marketing', label: 'Campañas', icon: Target },
       { href: '/admin/comunidad', label: 'Comunidad', icon: MessageSquare },
+      { href: '/admin/comunidad/pulse', label: 'Community Pulse', icon: Activity, badge: 'NEW' },
       { href: '/admin/contenido', label: 'Contenido', icon: Megaphone },
     ],
   },

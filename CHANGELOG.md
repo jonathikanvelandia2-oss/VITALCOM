@@ -1,5 +1,60 @@
 # Vitalcom Platform — Changelog
 
+## [2.20.0] — 2026-04-22
+
+**V35 — Community Pulse: vista CEO agregada de los 1500 VITALCOMMERS.**
+
+V34 entregó insights individuales para cada VITALCOMMER. V35 entrega el **otro lado**: el CEO de Vitalcom ve ahora la salud de toda la comunidad en un solo dashboard con distribución, top movers, at-risk list priorizada y cobertura de insights. Completa el ciclo de inteligencia comunitaria.
+
+### Helpers puros ([src/lib/community/pulse-helpers.ts](src/lib/community/pulse-helpers.ts)) — **27 tests** ✅
+- `computeSegmentDistribution(counts[])` — normaliza a porcentajes (1 decimal) preservando orden + count original
+- `computeTopMovers(inputs[], limit)` — ordena up/down por magnitud; filtra revenue=0 y |delta|<5% (ruido)
+- `computeAtRiskList(inputs[], options)` — rankea por prioridad de intervención:
+  - `weight=10` — recién cayó ACTIVE → AT_RISK (crítico)
+  - `weight=7` — AT_RISK con revenue activo
+  - `weight=4` — CHURNED sin intervención reciente
+  - `weight=1` — CHURNED con intervención reciente (ya intentamos)
+  - Cooldown configurable (default 7 días)
+- `computeCoverage(input)` — % de users con insight esta semana, con label `bajo/medio/alto/excelente`
+
+### Service ([src/lib/community/pulse-service.ts](src/lib/community/pulse-service.ts))
+- `getCommunityPulse()` paraleliza 5 queries agregadas (distribution + counts + insights + health scores)
+- Reutiliza datos de `WeeklyInsight` — NO recomputa snapshots por usuario (eficiente para 1500+)
+- Join in-memory entre `UserHealthScore` y `WeeklyInsight` para at-risk enriquecido con revenue
+- Cap 100 at-risk en memoria para evitar cargas gigantes
+
+### API ([src/app/api/admin/community/pulse/route.ts](src/app/api/admin/community/pulse/route.ts))
+- `GET /api/admin/community/pulse` con `requireRole('MANAGER_AREA')` (SUPERADMIN/ADMIN/MANAGER_AREA)
+
+### UI ([src/app/admin/comunidad/pulse/page.tsx](src/app/admin/comunidad/pulse/page.tsx))
+- **4 KPI cards**: activos · insights generados (con color según cobertura) · revenue total · at-risk count
+- **Barra de distribución** colorizada por segment (NEW azul, ACTIVE lima, AT_RISK ámbar, CHURNED rojo)
+- **4 stat cards** detallando cada segment con count + %
+- **Top 5 subiendo / Top 5 cayendo** lado a lado con delta% + revenue + segment
+- **Lista at-risk** con badge de prioridad (URGENTE/ALTA/MEDIA/BAJA), razón human-readable, link a perfil
+- Reutiliza `AdminTopbar` existente
+
+### Hook + navegación
+- `useCommunityPulse()` con staleTime 5min ([src/hooks/useCommunityPulse.ts](src/hooks/useCommunityPulse.ts))
+- Link en AdminSidebar bajo "Marketing → Community Pulse" con badge NEW
+
+### Tests totales
+- Antes: 367/367 ✅
+- Después: **394/394 ✅** (+27)
+
+### Valor estratégico entregado
+- CEO ahora identifica en 5 segundos quién necesita retención humana (lista priorizada)
+- Visibilidad real de la comunidad vs sentirse "a ciegas"
+- Feedback loop: ve el impacto del cron de insights (cobertura label)
+- Detecta top performers para amplificar casos de éxito
+
+### Pendiente (futuro)
+- Export CSV de at-risk list para campañas manuales
+- Timeline de pulse semana a semana (historia)
+- Triggers automáticos cuando un user cae ACTIVE → AT_RISK (crear escalation ticket)
+
+---
+
 ## [2.19.0] — 2026-04-22
 
 **V34.1 — Weekly Insight ciclo completo: cron dominical + benchmarking + notifications + página dedicada.**
