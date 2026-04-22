@@ -1,5 +1,62 @@
 # Vitalcom Platform — Changelog
 
+## [2.16.0] — 2026-04-22
+
+**Cobertura crítica — 4 módulos antes sin tests ahora cubiertos.**
+
+Extracción de lógica pura de 4 módulos core (semantic-cache, broadcast-runner, orchestrator, workflow-engine) a helpers exportables + tests unitarios. **+113 tests** (187 → 300) sin agregar un solo mock de Prisma — cada helper es testeable en aislamiento.
+
+### Cobertura añadida
+
+**semantic-cache** (V28) — [src/lib/ai/__tests__/semantic-cache.test.ts](src/lib/ai/__tests__/semantic-cache.test.ts) · **30 tests**:
+- `normalizeQuery` · `hashQuery` (determinismo, aislamiento por user/agente)
+- `containsPersonalData` (regex monedas LATAM + ROAS + márgenes)
+- `cachePolicy` (nueva función exportada — fuente única de verdad para decidir qué cachear y qué es canónico cross-user)
+- `TTL_BY_AGENT` (invariantes: agentes financieros ≤15min, educativos ≥60min, ESCALATE_HUMAN=0)
+- `CANONICAL_AGENTS` (garantiza que agentes con datos personales nunca sirven cross-user)
+
+**broadcast-runner** (V29/V30) — [src/lib/whatsapp/__tests__/broadcast-runner.test.ts](src/lib/whatsapp/__tests__/broadcast-runner.test.ts) · **25 tests**:
+- `buildSegmentWhere` — builder aislado del where Prisma (garantiza `onlyOptedIn=false` no incluye opt-outs por accidente, composición segmento + país + minLtv)
+- `matchesTagFilter` — filtro de tags in-memory (include OR-any, exclude OR-any, tolerancia a BD sucia)
+- `needsTagFilter` — decide si aplicar pasada in-memory
+- Guardrails `MAX_RECIPIENTS` (≤10k) + `RESOLVE_CHUNK` (≤1k)
+
+**orchestrator** (V26) — [src/lib/ai/__tests__/orchestrator.test.ts](src/lib/ai/__tests__/orchestrator.test.ts) · **26 tests**:
+- `AGENT_MAP` — cobertura total classifier→Prisma sin gaps
+- `AGENT_PROMPTS` — guards de contenido (VITA menciona Vitalcom, MENTOR_FINANCIERO menciona "ingresos", CEO_ADVISOR restringido a admin, español LATAM en todos)
+- `taskTypeFor` — ruteo a reasoning/creative/conversation_complex/conversation_simple (cobertura total)
+- `needsPGContext` — solo 5 agentes financieros/operativos usan P&G (ahorra query en conversacionales)
+- `temperatureFor` — CREATIVO_MAKER=0.8, resto=0.3 (determinismo financiero)
+- `shouldEscalateLowConfidence` — escala si <0.5 + urgencia ≥high (umbral estricto)
+- `escalationPriorityFor` — critical→URGENT, resto→HIGH
+
+**workflow-engine** (V27) — [src/lib/flows/__tests__/workflow-engine.test.ts](src/lib/flows/__tests__/workflow-engine.test.ts) · **32 tests**:
+- `resolveVariable` / `resolveTemplate` / `interpolate` — interpolación `{{var}}` con contact.*, literales, edge cases (null, 0, false → render correcto; variable faltante → string vacío, no "undefined")
+- `evalCondition` — 9 operadores (eq/neq/gt/lt/gte/lte/contains/in/exists) con coerción numérica segura, NaN→false, operador desconocido→false (fail-safe)
+
+### Refactors (single source of truth)
+
+- `broadcast-runner.resolveRecipients` ahora usa los helpers `buildSegmentWhere` + `matchesTagFilter` + `needsTagFilter` (antes: lógica inline duplicable)
+- `orchestrator.orchestrate` ahora usa `taskTypeFor` + `needsPGContext` + `temperatureFor` + `shouldEscalateLowConfidence` + `escalationPriorityFor` (antes: ternarios anidados inline)
+
+### Guarantees ganadas
+
+1. **Privacidad cross-user** (semantic-cache) — cualquier respuesta con datos personales se rechaza del cache antes de save
+2. **Segmentación correcta** (broadcast-runner) — opt-out/tags nunca causan falsos positivos
+3. **Ruteo consistente** (orchestrator) — cada nuevo ChatAgent debe declarar su taskType explícitamente en los tests
+4. **Interpolación segura** (workflow-engine) — mensajes enviados a clientes nunca contienen "undefined" ni rompen por tipos
+
+### Tests totales
+- Antes: 187/187 ✅
+- Después: **300/300 ✅** (+113)
+
+### Pendiente (siguiente sprint)
+- Integration tests con mocks Prisma para `prepareBroadcast` + `executeBroadcast` + `orchestrate` (alto costo de setup, bajo ROI marginal vs helpers puros)
+- Polish pre-prod: skeletons + error boundaries en páginas residuales
+- Phase B V33 (VideoMaker FFmpeg, VideoGen multi-provider, Shopify push) — bloqueado por credenciales CEO
+
+---
+
 ## [2.15.0] — 2026-04-22
 
 **V33 Foundation — Product Studio (catálogo visual + 4 agentes creativos).**

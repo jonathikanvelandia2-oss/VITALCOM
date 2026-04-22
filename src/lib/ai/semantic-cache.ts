@@ -21,7 +21,7 @@ export interface CacheEntry {
   layer: 'exact' | 'semantic'
 }
 
-function normalizeQuery(text: string): string {
+export function normalizeQuery(text: string): string {
   return text
     .toLowerCase()
     .replace(/\s+/g, ' ')
@@ -29,17 +29,17 @@ function normalizeQuery(text: string): string {
     .trim()
 }
 
-function hashQuery(userId: string | null, agentName: ChatAgent, text: string): string {
+export function hashQuery(userId: string | null, agentName: ChatAgent, text: string): string {
   const payload = `${userId ?? 'anon'}:${agentName}:${normalizeQuery(text)}`
   return crypto.createHash('sha256').update(payload).digest('hex')
 }
 
-function containsPersonalData(response: string): boolean {
+export function containsPersonalData(response: string): boolean {
   return /(\$\s*\d|(\bCOP\b|\bUSD\b|\bCLP\b|\bGTQ\b)\s*\d|\d{1,2}\.\d{1,2}x|\bmargen.*\d|\bpedidos?:\s*\d)/i.test(response)
 }
 
 // TTL en minutos por agente
-const TTL_BY_AGENT: Record<ChatAgent, number> = {
+export const TTL_BY_AGENT: Record<ChatAgent, number> = {
   VITA: 120,
   MENTOR_FINANCIERO: 10,
   BLUEPRINT_ANALYST: 30,
@@ -52,13 +52,28 @@ const TTL_BY_AGENT: Record<ChatAgent, number> = {
 }
 
 // Agentes cuyas respuestas pueden ser canónicas (educativas, de catálogo)
-const CANONICAL_AGENTS: ChatAgent[] = [
+export const CANONICAL_AGENTS: ChatAgent[] = [
   ChatAgent.VITA,
   ChatAgent.SOPORTE_IA,
   ChatAgent.CREATIVO_MAKER,
 ]
 
-const SEMANTIC_THRESHOLD = 0.92
+export const SEMANTIC_THRESHOLD = 0.92
+
+// Política de cacheo: decide si una respuesta debe cachearse y si es canónica
+// (puede servir cross-user). Aislada para poder testear sin Prisma.
+export function cachePolicy(agentName: ChatAgent, response: string): {
+  shouldCache: boolean
+  isCanonical: boolean
+} {
+  const hasPersonal = containsPersonalData(response)
+  const canonicalAllowed = CANONICAL_AGENTS.includes(agentName)
+  const isCanonical = !hasPersonal && canonicalAllowed
+  // Si contiene datos personales y no es canónica, no se cachea (evita fugar
+  // cifras entre sesiones del mismo user).
+  const shouldCache = isCanonical || !hasPersonal
+  return { shouldCache, isCanonical }
+}
 
 // ─── Lookup: exacto primero, semántico si falla ────────────
 export async function lookup(params: {

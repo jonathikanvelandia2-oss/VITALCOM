@@ -33,7 +33,7 @@ import {
 } from '@prisma/client'
 
 // ─── Prompts base por agente ────────────────────────────────
-const AGENT_PROMPTS: Record<ChatAgent, string> = {
+export const AGENT_PROMPTS: Record<ChatAgent, string> = {
   VITA: `
 Eres VITA, el asistente principal de Vitalcom Platform. Primer contacto para dropshippers VITALCOMMERS.
 Hablas español natural LATAM. Vitalcom es una comunidad SIN ÁNIMO DE LUCRO de proveeduría de
@@ -83,7 +83,7 @@ correcta con contexto completo.`.trim(),
 }
 
 // ─── Mapping AgentKey (classifier) → ChatAgent (Prisma) ─────
-const AGENT_MAP: Record<AgentKey, ChatAgent> = {
+export const AGENT_MAP: Record<AgentKey, ChatAgent> = {
   VITA: ChatAgent.VITA,
   MENTOR_FINANCIERO: ChatAgent.MENTOR_FINANCIERO,
   BLUEPRINT_ANALYST: ChatAgent.BLUEPRINT_ANALYST,
@@ -93,6 +93,59 @@ const AGENT_MAP: Record<AgentKey, ChatAgent> = {
   OPTIMIZADOR_TIENDA: ChatAgent.OPTIMIZADOR_TIENDA,
   SOPORTE_IA: ChatAgent.SOPORTE_IA,
   ESCALATE_HUMAN: ChatAgent.ESCALATE_HUMAN,
+}
+
+// ─── Policies puras por agente (extraídas para testeabilidad) ─
+export type TaskType = 'reasoning' | 'creative' | 'conversation_complex' | 'conversation_simple'
+
+// Clasifica al agente en el taskType correcto para el LLM router.
+// Mantener este mapeo aislado evita deriva: cada nuevo agente debe
+// declarar su tipo explícitamente en los tests.
+export function taskTypeFor(agent: ChatAgent): TaskType {
+  if (agent === ChatAgent.MENTOR_FINANCIERO || agent === ChatAgent.CEO_ADVISOR) {
+    return 'reasoning'
+  }
+  if (agent === ChatAgent.CREATIVO_MAKER) {
+    return 'creative'
+  }
+  if (
+    agent === ChatAgent.MEDIA_BUYER
+    || agent === ChatAgent.OPTIMIZADOR_TIENDA
+    || agent === ChatAgent.BLUEPRINT_ANALYST
+  ) {
+    return 'conversation_complex'
+  }
+  return 'conversation_simple'
+}
+
+// Indica si el agente necesita contexto P&G (datos financieros reales).
+// Solo agentes que hablan de dinero/rendimiento lo requieren.
+export function needsPGContext(agent: ChatAgent): boolean {
+  return agent === ChatAgent.MENTOR_FINANCIERO
+    || agent === ChatAgent.MEDIA_BUYER
+    || agent === ChatAgent.BLUEPRINT_ANALYST
+    || agent === ChatAgent.OPTIMIZADOR_TIENDA
+    || agent === ChatAgent.CEO_ADVISOR
+}
+
+// Temperatura del LLM por agente. Creativo necesita variedad (0.8),
+// el resto determinístico (0.3) para consistencia de datos financieros.
+export function temperatureFor(agent: ChatAgent): number {
+  return agent === ChatAgent.CREATIVO_MAKER ? 0.8 : 0.3
+}
+
+// Determina si una salida del LLM debe escalar a humano: baja confianza
+// + urgencia alta/crítica → escalar con draft.
+export function shouldEscalateLowConfidence(
+  llmConfidence: number,
+  urgency: 'low' | 'medium' | 'high' | 'critical',
+): boolean {
+  return llmConfidence < 0.5 && (urgency === 'high' || urgency === 'critical')
+}
+
+// Mapea EscalationPriority desde urgency — mismo criterio que orchestrate().
+export function escalationPriorityFor(urgency: 'low' | 'medium' | 'high' | 'critical'): 'URGENT' | 'HIGH' {
+  return urgency === 'critical' ? 'URGENT' : 'HIGH'
 }
 
 export interface OrchestratorInput {
@@ -165,7 +218,7 @@ export async function orchestrate(input: OrchestratorInput): Promise<Orchestrato
       userMessage: input.userMessage,
     })
 
-    const priority = classification.urgency === 'critical'
+    const priority = escalationPriorityFor(classification.urgency) === 'URGENT'
       ? EscalationPriority.URGENT
       : EscalationPriority.HIGH
     const responseText = humanizedEscalationResponse(priority, ticket.toArea, persona.firstName)
@@ -232,11 +285,7 @@ export async function orchestrate(input: OrchestratorInput): Promise<Orchestrato
   // 5. Construir contexto en paralelo
   const [userContext, pgContext] = await Promise.all([
     buildUserContext(input.userId, input.userMessage, activeThread.id),
-    selectedAgent === ChatAgent.MENTOR_FINANCIERO
-      || selectedAgent === ChatAgent.MEDIA_BUYER
-      || selectedAgent === ChatAgent.BLUEPRINT_ANALYST
-      || selectedAgent === ChatAgent.OPTIMIZADOR_TIENDA
-      || selectedAgent === ChatAgent.CEO_ADVISOR
+    needsPGContext(selectedAgent)
       ? getPGContext(input.userId).catch(() => '')
       : Promise.resolve(''),
   ])
@@ -250,14 +299,7 @@ export async function orchestrate(input: OrchestratorInput): Promise<Orchestrato
   ].filter(Boolean).join('\n\n')
 
   // 6. Determinar taskType para el router (afecta matrix futura de Claude)
-  const taskType =
-    selectedAgent === ChatAgent.MENTOR_FINANCIERO
-      || selectedAgent === ChatAgent.CEO_ADVISOR ? 'reasoning'
-    : selectedAgent === ChatAgent.CREATIVO_MAKER ? 'creative'
-    : selectedAgent === ChatAgent.MEDIA_BUYER
-      || selectedAgent === ChatAgent.OPTIMIZADOR_TIENDA
-      || selectedAgent === ChatAgent.BLUEPRINT_ANALYST ? 'conversation_complex'
-    : 'conversation_simple'
+  const taskType = taskTypeFor(selectedAgent)
 
   // 7. Llamar al LLM
   const llmResponse = await route({
@@ -265,12 +307,12 @@ export async function orchestrate(input: OrchestratorInput): Promise<Orchestrato
     systemPrompt,
     messages: [{ role: 'user', content: input.userMessage }],
     maxTokens: 600,
-    temperature: selectedAgent === ChatAgent.CREATIVO_MAKER ? 0.8 : 0.3,
+    temperature: temperatureFor(selectedAgent),
     userId: input.userId,
   })
 
   // 8. Si confianza baja y urgencia >=high → escalar con draft
-  if (llmResponse.confidence < 0.5 && (classification.urgency === 'high' || classification.urgency === 'critical')) {
+  if (shouldEscalateLowConfidence(llmResponse.confidence, classification.urgency)) {
     const ticket = await createEscalationTicket({
       userId: input.userId,
       threadId: activeThread.id,

@@ -643,8 +643,8 @@ async function stepEscalate(step: WorkflowStep, ctx: ExecutionContext) {
   return { ticketId: ticket.id, toArea: ticket.toArea }
 }
 
-// ─── Helpers ────────────────────────────────────────────────
-function resolveVariable(expr: string, vars: Record<string, unknown>, contact: WhatsappContact | null): string {
+// ─── Helpers (exportados para tests) ────────────────────────
+export function resolveVariable(expr: string, vars: Record<string, unknown>, contact: WhatsappContact | null): string {
   if (!expr?.startsWith('{{')) return expr
   const key = expr.replace(/[{}]/g, '').trim()
   if (key.startsWith('contact.') && contact) {
@@ -653,7 +653,7 @@ function resolveVariable(expr: string, vars: Record<string, unknown>, contact: W
   return String(vars[key] ?? '')
 }
 
-function resolveTemplate(tpl: string, vars: Record<string, unknown>, contact: WhatsappContact | null): string {
+export function resolveTemplate(tpl: string, vars: Record<string, unknown>, contact: WhatsappContact | null): string {
   return tpl.replace(/\{\{(\w+(?:\.\w+)?)\}\}/g, (_, key: string) => {
     if (key.startsWith('contact.') && contact) {
       return String((contact as unknown as Record<string, unknown>)[key.replace('contact.', '')] ?? '')
@@ -662,11 +662,11 @@ function resolveTemplate(tpl: string, vars: Record<string, unknown>, contact: Wh
   })
 }
 
-function interpolate(tpl: string, vars: Record<string, unknown>): string {
+export function interpolate(tpl: string, vars: Record<string, unknown>): string {
   return tpl.replace(/\{\{(\w+(?:\.\w+)?)\}\}/g, (_, key: string) => String(vars[key] ?? ''))
 }
 
-function evalCondition(fieldValue: unknown, operator: string, target: unknown): boolean {
+export function evalCondition(fieldValue: unknown, operator: string, target: unknown): boolean {
   switch (operator) {
     case 'eq':       return fieldValue === target
     case 'neq':      return fieldValue !== target

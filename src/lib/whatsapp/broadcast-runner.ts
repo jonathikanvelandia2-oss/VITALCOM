@@ -19,7 +19,7 @@ import {
   WaBroadcastRecipientStatus,
 } from '@prisma/client'
 
-interface SegmentFilter {
+export interface SegmentFilter {
   segment?: string
   tags?: string[]
   country?: string
@@ -30,9 +30,44 @@ interface SegmentFilter {
 
 // Tamaño máximo absoluto (protección contra broadcasts masivos que
 // podrían saturar memoria en una sola request serverless).
-const MAX_RECIPIENTS = 5000
+export const MAX_RECIPIENTS = 5000
 // Cursor page size — paginamos para no cargar todo en memoria.
-const RESOLVE_CHUNK = 500
+export const RESOLVE_CHUNK = 500
+
+// ─── Helpers puros (testables sin Prisma) ───────────────────
+
+// Construye el `where` de Prisma desde un SegmentFilter. Aislado para
+// garantizar que `onlyOptedIn=false` no introduce contactos opt-out por
+// accidente y que los filtros opcionales no colisionan.
+export function buildSegmentWhere(accountId: string, filter: SegmentFilter) {
+  return {
+    accountId,
+    ...(filter.onlyOptedIn !== false ? { isOptedIn: true } : {}),
+    ...(filter.segment ? { segment: filter.segment } : {}),
+    ...(filter.country ? { shippingCountry: filter.country } : {}),
+    ...(filter.minLtv != null ? { lifetimeValue: { gte: filter.minLtv } } : {}),
+  }
+}
+
+// Filtro de tags en memoria (Prisma no puede indexar JSON arrays con
+// contains bidireccional; lo hacemos después del fetch). Crítico: un
+// bug aquí manda el broadcast al segmento equivocado.
+export function matchesTagFilter(
+  contactTags: unknown,
+  includeTags: string[],
+  excludeTags: string[],
+): boolean {
+  const tagList = Array.isArray(contactTags) ? contactTags as Array<{ key?: string }> : []
+  const keys = tagList.map(t => t?.key).filter(Boolean) as string[]
+  if (includeTags.length > 0 && !includeTags.some(t => keys.includes(t))) return false
+  if (excludeTags.length > 0 && excludeTags.some(t => keys.includes(t))) return false
+  return true
+}
+
+// Indica si un filtro requiere pasada en memoria adicional después del query.
+export function needsTagFilter(filter: SegmentFilter): boolean {
+  return (filter.tags?.length ?? 0) > 0 || (filter.excludeTags?.length ?? 0) > 0
+}
 
 // Resuelve los contactos que matchean el filtro.
 // Usa cursor-pagination para procesar en chunks, evitando cargar
@@ -41,17 +76,10 @@ export async function resolveRecipients(
   accountId: string,
   filter: SegmentFilter,
 ): Promise<Array<{ id: string; phoneE164: string; firstName: string | null; tags: unknown }>> {
-  const where = {
-    accountId,
-    ...(filter.onlyOptedIn !== false ? { isOptedIn: true } : {}),
-    ...(filter.segment ? { segment: filter.segment } : {}),
-    ...(filter.country ? { shippingCountry: filter.country } : {}),
-    ...(filter.minLtv != null ? { lifetimeValue: { gte: filter.minLtv } } : {}),
-  }
-
+  const where = buildSegmentWhere(accountId, filter)
   const includeTags = filter.tags ?? []
   const excludeTags = filter.excludeTags ?? []
-  const needsTagFilter = includeTags.length > 0 || excludeTags.length > 0
+  const applyTagFilter = needsTagFilter(filter)
 
   const out: Array<{ id: string; phoneE164: string; firstName: string | null; tags: unknown }> = []
   let cursor: string | undefined
@@ -65,14 +93,8 @@ export async function resolveRecipients(
     })
     if (batch.length === 0) break
 
-    const filtered = needsTagFilter
-      ? batch.filter(c => {
-          const tagList = Array.isArray(c.tags) ? c.tags as Array<{ key?: string }> : []
-          const keys = tagList.map(t => t?.key).filter(Boolean) as string[]
-          if (includeTags.length > 0 && !includeTags.some(t => keys.includes(t))) return false
-          if (excludeTags.length > 0 && excludeTags.some(t => keys.includes(t))) return false
-          return true
-        })
+    const filtered = applyTagFilter
+      ? batch.filter(c => matchesTagFilter(c.tags, includeTags, excludeTags))
       : batch
 
     for (const r of filtered) {
