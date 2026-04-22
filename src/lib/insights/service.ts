@@ -21,17 +21,22 @@ import {
   generateHeadline,
   generateHighlights,
   generateRecommendations,
+  computePercentile,
+  average,
+  hasEnoughPeers,
   type Highlight,
   type Recommendation,
 } from './helpers'
-import type { UserHealthSegment } from '@prisma/client'
+import { NotificationType, type UserHealthSegment } from '@prisma/client'
 
 export interface GenerateParams {
   userId: string
   /** Fecha dentro de la semana a procesar. Default = ahora. */
   asOf?: Date
-  /** "cron" | "manual" */
+  /** "cron" | "manual" | "lazy" */
   source?: string
+  /** Si true, crea Notification al terminar (solo cron lo usa para evitar spam). */
+  notify?: boolean
 }
 
 export interface GeneratedInsight {
@@ -50,13 +55,15 @@ export interface GeneratedInsight {
   topProductName: string | null
   highlights: Highlight[]
   recommendations: Recommendation[]
+  tierAvgRevenue: number | null
+  tierPercentile: number | null
   generatedAt: Date
 }
 
 export async function generateWeeklyInsight(
   params: GenerateParams,
 ): Promise<GeneratedInsight | null> {
-  const { userId, source = 'manual' } = params
+  const { userId, source = 'manual', notify = false } = params
   const asOf = params.asOf ?? new Date()
 
   try {
@@ -128,7 +135,16 @@ export async function generateWeeklyInsight(
       hasShopify: Boolean(hasShopify),
     })
 
-    // 3) Upsert idempotente por (userId, weekStart)
+    // 3) Benchmarking — percentile dentro del mismo segment (anónimo, agregado)
+    const { tierAvgRevenue, tierPercentile } = await computeTierBenchmark({
+      userId,
+      segment: healthScore?.segment ?? null,
+      weekStart: week.start,
+      weekEnd: week.end,
+      userRevenue: pgNow.revenueGross,
+    })
+
+    // 4) Upsert idempotente por (userId, weekStart)
     const saved = await prisma.weeklyInsight.upsert({
       where: { userId_weekStart: { userId, weekStart: week.start } },
       create: {
@@ -153,6 +169,8 @@ export async function generateWeeklyInsight(
         headline,
         highlights: highlights as object,
         recommendations: recommendations as object,
+        tierAvgRevenue,
+        tierPercentile,
         source,
       },
       update: {
@@ -174,11 +192,31 @@ export async function generateWeeklyInsight(
         headline,
         highlights: highlights as object,
         recommendations: recommendations as object,
+        tierAvgRevenue,
+        tierPercentile,
         generatedAt: new Date(),
         source,
         // No sobreescribimos readAt — el usuario lo tocó si lo vio
       },
     })
+
+    // 5) Notification (solo si notify=true, típicamente desde cron)
+    if (notify) {
+      // Best-effort: idempotencia por (userId, meta.insightId) no es crítica —
+      // si falla, no bloquea el insight ya persistido.
+      await prisma.notification.create({
+        data: {
+          userId,
+          type: NotificationType.WEEKLY_INSIGHT,
+          title: 'Tu resumen semanal está listo',
+          body: headline,
+          link: '/insights',
+          meta: { insightId: saved.id, weekStart: week.start.toISOString() },
+        },
+      }).catch(err => {
+        captureException(err, { route: 'insights.notify', userId })
+      })
+    }
 
     captureEvent('insights.weekly.generated', {
       userId,
@@ -206,11 +244,69 @@ export async function generateWeeklyInsight(
       topProductName: saved.topProductName,
       highlights,
       recommendations,
+      tierAvgRevenue: saved.tierAvgRevenue,
+      tierPercentile: saved.tierPercentile,
       generatedAt: saved.generatedAt,
     }
   } catch (err) {
     captureException(err, { route: 'insights.generate', userId })
     return null
+  }
+}
+
+/**
+ * Calcula el benchmark del tier (segment) actual del usuario.
+ * Solo devuelve valores si hay suficientes peers para preservar
+ * privacidad (MIN_PEERS_FOR_BENCHMARK=5).
+ *
+ * Usa WeeklyInsight como fuente ya agregada — más eficiente que
+ * recomputar snapshots para 100+ peers.
+ */
+async function computeTierBenchmark(params: {
+  userId: string
+  segment: UserHealthSegment | null
+  weekStart: Date
+  weekEnd: Date
+  userRevenue: number
+}): Promise<{ tierAvgRevenue: number | null; tierPercentile: number | null }> {
+  if (!params.segment) {
+    return { tierAvgRevenue: null, tierPercentile: null }
+  }
+
+  // Traemos insights del mismo segment para la misma semana, excluyendo
+  // al propio usuario. Si la mayoría de peers aún no tienen insight de la
+  // semana (por ejemplo generación temprana en la semana), caemos a la
+  // semana previa para tener más muestras.
+  let peers = await prisma.weeklyInsight.findMany({
+    where: {
+      segment: params.segment,
+      weekStart: params.weekStart,
+      userId: { not: params.userId },
+    },
+    select: { revenue: true },
+  })
+
+  if (!hasEnoughPeers(peers.length)) {
+    const prevStart = new Date(params.weekStart)
+    prevStart.setUTCDate(prevStart.getUTCDate() - 7)
+    peers = await prisma.weeklyInsight.findMany({
+      where: {
+        segment: params.segment,
+        weekStart: prevStart,
+        userId: { not: params.userId },
+      },
+      select: { revenue: true },
+    })
+  }
+
+  if (!hasEnoughPeers(peers.length)) {
+    return { tierAvgRevenue: null, tierPercentile: null }
+  }
+
+  const revenues = peers.map(p => p.revenue)
+  return {
+    tierAvgRevenue: average(revenues),
+    tierPercentile: computePercentile(params.userRevenue, revenues),
   }
 }
 
@@ -268,8 +364,42 @@ export async function getLatestInsight(userId: string): Promise<GeneratedInsight
     topProductName: row.topProductName,
     highlights: (row.highlights as unknown as Highlight[]) ?? [],
     recommendations: (row.recommendations as unknown as Recommendation[]) ?? [],
+    tierAvgRevenue: row.tierAvgRevenue,
+    tierPercentile: row.tierPercentile,
     generatedAt: row.generatedAt,
   }
+}
+
+/**
+ * Histórico de insights para el usuario (más reciente primero).
+ * Lo usa la página dedicada /insights para graficar evolución.
+ */
+export async function getInsightHistory(userId: string, limit = 8): Promise<GeneratedInsight[]> {
+  const rows = await prisma.weeklyInsight.findMany({
+    where: { userId },
+    orderBy: { weekStart: 'desc' },
+    take: Math.min(limit, 52),
+  })
+  return rows.map(row => ({
+    id: row.id,
+    weekStart: row.weekStart,
+    weekEnd: row.weekEnd,
+    headline: row.headline,
+    revenue: row.revenue,
+    revenueDeltaPct: row.revenueDeltaPct,
+    orderCount: row.orderCount,
+    netProfit: row.netProfit,
+    roas: row.roas,
+    healthScore: row.healthScore,
+    healthDelta: row.healthDelta,
+    segment: row.segment,
+    topProductName: row.topProductName,
+    highlights: (row.highlights as unknown as Highlight[]) ?? [],
+    recommendations: (row.recommendations as unknown as Recommendation[]) ?? [],
+    tierAvgRevenue: row.tierAvgRevenue,
+    tierPercentile: row.tierPercentile,
+    generatedAt: row.generatedAt,
+  }))
 }
 
 export async function markInsightAsRead(userId: string, insightId: string): Promise<void> {

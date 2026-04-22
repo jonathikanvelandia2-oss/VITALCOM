@@ -200,6 +200,51 @@ function formatMoney(value: number): string {
   return value.toFixed(0)
 }
 
+// ─── Benchmarking (percentile en un set anónimo) ───────────
+
+/**
+ * Calcula el percentile 0-100 de `value` dentro del array `peers`.
+ * Definición estándar: % de peers <= value.
+ *
+ * - Si `peers` vacío → null (no hay benchmark confiable)
+ * - Si value <= min → 0
+ * - Si value >= max → 100
+ * - Empates: cuentan al valor del usuario
+ *
+ * Diseñado para responder "¿en qué lugar estás dentro de tu tier?"
+ * con semántica intuitiva (100 = top performer, 0 = último).
+ */
+export function computePercentile(value: number, peers: number[]): number | null {
+  if (peers.length === 0) return null
+  let belowOrEqual = 0
+  for (const p of peers) {
+    if (p <= value) belowOrEqual++
+  }
+  return Math.round((belowOrEqual / peers.length) * 100)
+}
+
+/**
+ * Promedio aritmético (con guard por vacío). Devuelve 0 para arrays vacíos
+ * para simplificar sumas descendentes, pero el caller debe chequear length.
+ */
+export function average(values: number[]): number {
+  if (values.length === 0) return 0
+  let sum = 0
+  for (const v of values) sum += v
+  return sum / values.length
+}
+
+/**
+ * ¿El tamaño del grupo peer es suficiente para mostrar benchmark?
+ * Threshold: >=5 miembros para que el percentile no sea manipulable
+ * ni identificable individualmente (privacy).
+ */
+export const MIN_PEERS_FOR_BENCHMARK = 5
+
+export function hasEnoughPeers(peerCount: number): boolean {
+  return peerCount >= MIN_PEERS_FOR_BENCHMARK
+}
+
 // ─── Recomendaciones accionables ──────────────────────────
 
 export type RecommendationPriority = 'critical' | 'high' | 'medium' | 'low'

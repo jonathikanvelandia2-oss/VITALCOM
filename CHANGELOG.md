@@ -1,5 +1,73 @@
 # Vitalcom Platform — Changelog
 
+## [2.19.0] — 2026-04-22
+
+**V34.1 — Weekly Insight ciclo completo: cron dominical + benchmarking + notifications + página dedicada.**
+
+El v2.18 entregó la feature core. Esta release cierra el ciclo operativo:
+los insights ahora se generan automáticamente cada domingo, el usuario recibe
+una notificación, ve su percentil anónimo vs otros VITALCOMMERS de su tier,
+y tiene un histórico dedicado en `/insights`.
+
+### Benchmarking anónimo ([src/lib/insights/service.ts](src/lib/insights/service.ts))
+Nueva función `computeTierBenchmark`:
+- Agrega `revenue` de peers en el mismo `UserHealthSegment` (excluyendo al user)
+- Fallback a semana previa si la actual no tiene suficientes peers (cron corre temprano en domingo)
+- Privacy-by-default: `MIN_PEERS_FOR_BENCHMARK=5` — bajo ese umbral devuelve `null`
+- Llena `tierAvgRevenue` y `tierPercentile` (0-100) en el WeeklyInsight
+
+Nuevos helpers puros ([src/lib/insights/helpers.ts](src/lib/insights/helpers.ts)) · **+15 tests**:
+- `computePercentile(value, peers[])` — `% de peers <= value`, con edge cases (array vacío → null, value debajo mínimo → 0, value = max → 100, empates cuentan al user)
+- `average(values[])` — guard por vacío
+- `hasEnoughPeers(count)` + `MIN_PEERS_FOR_BENCHMARK=5`
+
+### Notification automática ([src/lib/insights/service.ts](src/lib/insights/service.ts))
+- Nuevo `NotificationType.WEEKLY_INSIGHT` en el schema
+- `generateWeeklyInsight({notify: true})` crea una `Notification` con link a `/insights` y body = `headline`
+- Best-effort: si falla, captura a observability pero no rompe el insight ya persistido
+- Solo el cron usa `notify: true` (manual/lazy no para evitar spam durante regeneraciones)
+
+### Cron dominical ([src/app/api/insights/cron/route.ts](src/app/api/insights/cron/route.ts))
+- Schedule `0 9 * * 0` en [vercel.json](vercel.json) — **domingo 9am UTC = 4am Colombia** (antes de que los users despierten)
+- Auth `CRON_SECRET` + fallback dev-mode
+- [src/lib/insights/cron.ts](src/lib/insights/cron.ts) — `runWeeklyInsightBatch`:
+  - Paginación cursor-based chunks de 100 users
+  - Concurrencia limitada a 5 en paralelo (no satura DB)
+  - Filtra `active=true` + role COMMUNITY/DROPSHIPPER + segment in ACTIVE/AT_RISK/CHURNED (excluye NEW)
+  - Si un user individual falla, loggea y continúa (no aborta el batch)
+  - Retorna `{processed, succeeded, failed, durationMs, errors[]}`
+  - `captureEvent('insights.cron.completed')` con métricas
+
+### Página dedicada [/insights](src/app/(community)/insights/page.tsx)
+- Header con branding + descripción del feature
+- `WeeklyInsightCard` actual (reutilizado del v2.18)
+- Nuevo `BenchmarkCard` con 3 stats: percentile + user revenue + tier average + delta
+  - Color verde si arriba del promedio, ámbar si abajo
+  - Badges "Top 25%" / "Arriba del promedio" / etc
+- Histórico últimas 8 semanas con `HistoryRow` compacto (fecha + headline + delta + revenue + pedidos)
+- Link añadido al [CommunitySidebar](src/components/community/CommunitySidebar.tsx) con badge NEW
+
+### API ampliada
+- `GET /api/insights/me/history?limit=N` — últimos N insights del user (max 52)
+- `useMyInsightHistory(limit)` hook + invalidación cruzada con regenerate
+
+### Schema change
+- `NotificationType.WEEKLY_INSIGHT` agregado al enum
+- Tipo de retorno `GeneratedInsight` extendido con `tierAvgRevenue` + `tierPercentile`
+
+### Cron total Vercel: **12** (era 11)
+
+### Tests totales
+- Antes: 352/352 ✅
+- Después: **367/367 ✅** (+15 benchmarking helpers)
+
+### Pendiente (futuro)
+- Cobertura end-to-end del cron con Prisma mock (ROI bajo vs helpers puros)
+- Overlay LLM opcional para enriquecer headline cuando hay >10 datos (feature bandera)
+- Export PDF del insight semanal (share a externos)
+
+---
+
 ## [2.18.0] — 2026-04-22
 
 **V34 — Weekly Insight Engine: unificación CEO-level de la semana del VITALCOMMER.**

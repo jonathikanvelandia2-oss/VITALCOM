@@ -9,6 +9,10 @@ import {
   generateHeadline,
   generateHighlights,
   generateRecommendations,
+  computePercentile,
+  average,
+  hasEnoughPeers,
+  MIN_PEERS_FOR_BENCHMARK,
 } from '../helpers'
 
 describe('getWeekBounds', () => {
@@ -335,5 +339,81 @@ describe('generateRecommendations', () => {
       expect(r.title.length).toBeGreaterThan(0)
       expect(r.action.length).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('computePercentile', () => {
+  it('array vacío → null (sin benchmark confiable)', () => {
+    expect(computePercentile(100, [])).toBeNull()
+  })
+
+  it('value debajo del mínimo → 0', () => {
+    expect(computePercentile(10, [50, 100, 200])).toBe(0)
+  })
+
+  it('value en el máximo → 100', () => {
+    expect(computePercentile(200, [50, 100, 200])).toBe(100)
+  })
+
+  it('value en la mediana → ~50', () => {
+    const p = computePercentile(100, [50, 100, 150])
+    expect(p).toBeGreaterThanOrEqual(60)
+    expect(p).toBeLessThanOrEqual(70)
+  })
+
+  it('value en top-quarter → >=75', () => {
+    const p = computePercentile(175, [50, 75, 100, 125, 150, 175])
+    expect(p).toBeGreaterThanOrEqual(75)
+  })
+
+  it('redondea a entero 0-100', () => {
+    const p = computePercentile(100, [50, 100, 150])
+    expect(Number.isInteger(p)).toBe(true)
+    expect(p).toBeGreaterThanOrEqual(0)
+    expect(p).toBeLessThanOrEqual(100)
+  })
+
+  it('empates cuentan a favor del usuario', () => {
+    // value=100, peers=[100,100,100] → 3/3 = 100
+    expect(computePercentile(100, [100, 100, 100])).toBe(100)
+  })
+})
+
+describe('average', () => {
+  it('array vacío → 0 (sin dividir por cero)', () => {
+    expect(average([])).toBe(0)
+  })
+
+  it('un solo valor', () => {
+    expect(average([42])).toBe(42)
+  })
+
+  it('promedio normal', () => {
+    expect(average([10, 20, 30])).toBe(20)
+  })
+
+  it('tolera negativos', () => {
+    expect(average([-10, 0, 10])).toBe(0)
+  })
+
+  it('decimales correctos', () => {
+    expect(average([1, 2])).toBe(1.5)
+  })
+})
+
+describe('hasEnoughPeers + MIN_PEERS_FOR_BENCHMARK', () => {
+  it('bloque de privacidad es >=5', () => {
+    expect(MIN_PEERS_FOR_BENCHMARK).toBeGreaterThanOrEqual(5)
+  })
+
+  it('<5 peers → no benchmark (privacidad)', () => {
+    expect(hasEnoughPeers(0)).toBe(false)
+    expect(hasEnoughPeers(1)).toBe(false)
+    expect(hasEnoughPeers(4)).toBe(false)
+  })
+
+  it('>=5 peers → OK', () => {
+    expect(hasEnoughPeers(5)).toBe(true)
+    expect(hasEnoughPeers(100)).toBe(true)
   })
 })

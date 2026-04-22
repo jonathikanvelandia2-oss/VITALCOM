@@ -52,6 +52,8 @@ export interface WeeklyInsightData {
   topProductName: string | null
   highlights: WeeklyHighlight[]
   recommendations: WeeklyRecommendation[]
+  tierAvgRevenue: number | null
+  tierPercentile: number | null
   generatedAt: string
 }
 
@@ -76,6 +78,16 @@ export function useRegenerateWeeklyInsight() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['insights', 'me', 'weekly'] })
+      qc.invalidateQueries({ queryKey: ['insights', 'me', 'history'] })
     },
+  })
+}
+
+/** Histórico de insights del usuario (últimas 8 semanas por default). */
+export function useMyInsightHistory(limit = 8) {
+  return useQuery<{ items: WeeklyInsightData[] }>({
+    queryKey: ['insights', 'me', 'history', limit],
+    queryFn: () => fetcher(`/api/insights/me/history?limit=${limit}`),
+    staleTime: 30 * 60 * 1000,
   })
 }

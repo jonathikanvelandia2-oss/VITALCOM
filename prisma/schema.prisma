@@ -700,6 +700,7 @@ enum NotificationType {
   STORE_CONNECTED // Tienda Shopify conectada
   AI_ACTION // V20 — Acción IA crítica del Command Center
   MORNING_BRIEF // V25 — Brief diario del día (8AM con top 3 + KPIs)
+  WEEKLY_INSIGHT // V34 — Reporte semanal IA con recomendaciones
   SYSTEM // Anuncios de plataforma
 }
 
