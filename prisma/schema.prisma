@@ -152,6 +152,8 @@ model User {
   proactiveAlerts         ProactiveAlert[]
   // V32 — Health Score
   healthScore             UserHealthScore?
+  // V33 — Product Studio (dropshipper-owned landings)
+  productLandings         ProductLanding[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -207,6 +209,11 @@ model Product {
   campaignDrafts     CampaignDraft[]
   adCreatives        AdCreative[]
   storeOptimizations StoreOptimization[]
+  // V33 — Product Studio
+  productAssets      ProductAsset[]
+  productLandings   ProductLanding[]
+  ugcPackages        UgcPackage[]
+  videoClips         VideoClip[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -1968,4 +1975,309 @@ model UserHealthScore {
 
   @@index([segment, computedAt])
   @@index([score])
+}
+
+// ═══════════════════════════════════════════════════════════
+// V33 — Product Studio
+// ═══════════════════════════════════════════════════════════
+// Catálogo enriquecido con assets reales (fotos/videos/PDFs)
+// sincronizados desde Drive, editados con IA, y presentados
+// en landings de alta conversión con 4 agentes creativos.
+
+enum AssetType {
+  HERO
+  GALLERY
+  LIFESTYLE
+  PRODUCT_ONLY
+  PACK_SHOT
+  MOCKUP
+  REVIEW_PHOTO
+  BEFORE_AFTER
+  UGC_CLIP
+  REEL_MASTER
+  VIDEO_CUT
+  LANDING_HERO
+  EBOOK
+  BRAND_MANUAL
+  CERTIFICATE
+  INGREDIENT_INFO
+}
+
+enum SalesAngle {
+  PAIN
+  ASPIRATION
+  SOCIAL_PROOF
+  EXPERT
+  TESTIMONIAL
+  TRANSFORMATION
+  FEAR
+  CURIOSITY
+  EDUCATIONAL
+  SCARCITY
+  PRICE_ANCHOR
+}
+
+enum AssetFormat {
+  SQUARE_1x1
+  PORTRAIT_4x5
+  STORY_9x16
+  LANDSCAPE_16x9
+  BANNER_3x1
+  A4_PORTRAIT
+  FREEFORM
+}
+
+enum AssetStatus {
+  DRAFT
+  APPROVED
+  FEATURED
+  ARCHIVED
+  REJECTED
+}
+
+enum AssetQualityScore {
+  A_PREMIUM
+  B_STANDARD
+  C_ACCEPTABLE
+  UNRATED
+}
+
+model ProductAsset {
+  id              String       @id @default(cuid())
+  productId       String
+  product         Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // Origen Drive (o edit)
+  driveFileId     String       @unique
+  driveFolderPath String
+  driveFolderType String
+  driveLastSyncAt DateTime?
+  // Clasificación comercial
+  type            AssetType
+  angle           SalesAngle?
+  format          AssetFormat  @default(FREEFORM)
+  // Contenido Cloudinary
+  cloudinaryId    String?
+  cloudinaryUrl   String?
+  originalMime    String
+  width           Int?
+  height          Int?
+  durationSec     Int?
+  fileSizeBytes   Int?
+  // Segmentación
+  persona         String[]     @default([])
+  country         String[]     @default([])
+  language        String       @default("es_CO")
+  // Metadata editorial
+  title           String?
+  caption         String?
+  altText         String?
+  assetTags       String[]     @default([])
+  // Estado
+  status          AssetStatus  @default(DRAFT)
+  quality         AssetQualityScore @default(UNRATED)
+  usedAsDefault   Boolean      @default(false)
+  heroRank        Int?
+  // Trazabilidad
+  syncedBy        String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  videoCutsFromMe VideoClip[] @relation("SourceAsset")
+  edits           AssetEdit[]
+
+  @@index([productId, type])
+  @@index([productId, status, heroRank])
+  @@index([status])
+}
+
+enum EditOperation {
+  UPSCALE
+  REMOVE_BG
+  REPLACE_BG
+  OVERLAY_TEXT
+  OVERLAY_BADGE
+  COLOR_ADJUST
+  GENERATE_VARIANT
+  AUTO_CROP
+  WATERMARK
+}
+
+model AssetEdit {
+  id            String        @id @default(cuid())
+  sourceAssetId String
+  sourceAsset   ProductAsset  @relation(fields: [sourceAssetId], references: [id], onDelete: Cascade)
+  operation     EditOperation
+  params        Json
+  resultUrl     String?
+  resultAssetId String?
+  costUsd       Float         @default(0)
+  durationMs    Int?
+  createdBy     String
+  createdAt     DateTime      @default(now())
+
+  @@index([sourceAssetId])
+  @@index([createdBy, createdAt])
+}
+
+model ProductLanding {
+  id              String    @id @default(cuid())
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // null = template base Vitalcom; con id = versión del dropshipper
+  dropshipperId   String?
+  dropshipper     User?     @relation(fields: [dropshipperId], references: [id], onDelete: Cascade)
+  isTemplate      Boolean   @default(false)
+  clonedFromId    String?
+  // HERO
+  heroHeadline    String
+  heroSubhead     String?
+  heroAssetId     String?
+  heroAngle       SalesAngle?
+  heroRating      Float?
+  heroRatingCount Int?
+  // Secciones
+  benefits        Json      @default("[]")
+  painPoints      Json      @default("[]")
+  howItWorks      Json      @default("[]")
+  testimonials    Json      @default("[]")
+  faq             Json      @default("[]")
+  ugcClipIds      String[]  @default([])
+  galleryAssetIds String[]  @default([])
+  // Pricing
+  priceOverride   Int?
+  marginPercent   Float?
+  currencyCode    String?
+  // CTA
+  ctaPrimary      String    @default("Agregar a mi tienda")
+  ctaSecondary    String?
+  ctaUrl          String?
+  // SEO
+  seoTitle        String?
+  seoDescription  String?
+  seoKeywords     String[]  @default([])
+  ogImageAssetId  String?
+  // Publicación
+  status          String    @default("draft")
+  publishedAt     DateTime?
+  shopifyPageId   String?
+  shopifyPushedAt DateTime?
+  // Analytics
+  viewCount       Int       @default(0)
+  ctaClickCount   Int       @default(0)
+  lastViewedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([productId, dropshipperId])
+  @@index([productId, status])
+  @@index([dropshipperId, status])
+}
+
+model UgcPackage {
+  id              String     @id @default(cuid())
+  productId       String
+  product         Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  dropshipperId   String?
+  angle           SalesAngle
+  persona         String
+  platform        String
+  durationSec     Int
+  hookOptions     Json
+  shotList        Json
+  voiceoverScript String
+  bRollSuggested  Json
+  captionOverlays Json
+  musicStyle      String
+  hashtags        String[]   @default([])
+  bestPostTimes   Json
+  pdfShotListUrl  String?
+  timesUsed       Int        @default(0)
+  llmModel        String
+  costUsd         Float      @default(0)
+  createdAt       DateTime   @default(now())
+  videoClipsProduced VideoClip[]
+
+  @@index([productId, angle])
+  @@index([dropshipperId])
+}
+
+enum VideoProvider {
+  FFMPEG_EDIT
+  RUNWAY_GEN3
+  VEO_GOOGLE
+  SORA_OPENAI
+  PIKA_LABS
+}
+
+enum VideoStatus {
+  QUEUED
+  PROCESSING
+  RENDERED
+  FAILED
+  CANCELLED
+}
+
+model VideoClip {
+  id              String        @id @default(cuid())
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  dropshipperId   String?
+  provider        VideoProvider
+  sourceAssetId   String?
+  sourceAsset     ProductAsset? @relation("SourceAsset", fields: [sourceAssetId], references: [id])
+  ugcPackageId    String?
+  ugcPackage      UgcPackage?   @relation(fields: [ugcPackageId], references: [id])
+  prompt          String?
+  durationSec     Int
+  format          AssetFormat
+  scenesConfig    Json?
+  status          VideoStatus   @default(QUEUED)
+  queuedAt        DateTime      @default(now())
+  startedAt       DateTime?
+  renderedAt      DateTime?
+  failureReason   String?
+  outputUrl       String?
+  outputAssetId   String?
+  thumbnailUrl    String?
+  captionsVttUrl  String?
+  estimatedCostUsd Float        @default(0)
+  actualCostUsd    Float        @default(0)
+  createdAt       DateTime      @default(now())
+
+  @@index([productId, status])
+  @@index([dropshipperId, status])
+  @@index([status, queuedAt])
+}
+
+model DriveSyncRun {
+  id               String    @id @default(cuid())
+  startedAt        DateTime  @default(now())
+  finishedAt       DateTime?
+  status           String
+  rootFolderId     String
+  filesScanned     Int       @default(0)
+  filesNew         Int       @default(0)
+  filesUpdated     Int       @default(0)
+  filesUnchanged   Int       @default(0)
+  filesFailed      Int       @default(0)
+  errorLog         Json?     @default("[]")
+  bytesTransferred BigInt    @default(0)
+
+  @@index([startedAt])
+}
+
+model VideoBudgetLimit {
+  id              String   @id @default(cuid())
+  scope           String   @unique
+  dailyLimitUsd   Float
+  monthlyLimitUsd Float
+  usedTodayUsd    Float    @default(0)
+  usedMonthUsd    Float    @default(0)
+  resetDaily      DateTime
+  resetMonthly    DateTime
+  alertsSent      Json     @default("[]")
+  isActive        Boolean  @default(true)
 }

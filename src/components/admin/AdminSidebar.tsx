@@ -52,6 +52,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/pedidos', label: 'Pedidos', icon: ShoppingBag },
       { href: '/admin/clientes', label: 'Clientes CRM', icon: Users },
       { href: '/admin/catalogo', label: 'Catálogo maestro', icon: Package },
+      { href: '/admin/catalogo/assets', label: 'Product Studio', icon: Package, badge: 'NEW' },
     ],
   },
   {

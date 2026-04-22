@@ -1,5 +1,109 @@
 # Vitalcom Platform — Changelog
 
+## [2.15.0] — 2026-04-22
+
+**V33 Foundation — Product Studio (catálogo visual + 4 agentes creativos).**
+
+Análisis experto de la propuesta original del tar.gz en `docs/VC-A4/` detectó **8 problemas arquitectónicos** (singleton Prisma violado, zero auth en endpoints, BigInt sin serializar, tipos `any` masivos, sin rate limiting, cero MOCK mode, deps externas bloqueantes). Esta release entrega la **Fase A: Foundation** con las correcciones aplicadas y todo testeable sin credenciales pendientes CEO.
+
+### Arquitectura entregada
+
+**Schema Prisma (+7 models + 5 enums nuevos):**
+- `ProductAsset` · `AssetEdit` · `ProductLanding` · `UgcPackage` · `VideoClip` · `DriveSyncRun` · `VideoBudgetLimit`
+- Enums `AssetType` (16) · `SalesAngle` (11) · `AssetFormat` (7) · `AssetStatus` (5) · `AssetQualityScore` (4) · `EditOperation` (9) · `VideoProvider` (5) · `VideoStatus` (5)
+- Relaciones inversas en `Product` y `User`
+- 11 índices nuevos aplicados a Supabase
+
+**Helpers puros** (32 tests ✅):
+- `slugify()` — normaliza folder names (acentos, especiales)
+- `classifyDriveFolder()` — mapea 18 nombres de carpeta → AssetType + angle + format por defecto
+- `fuzzyMatchProduct()` — match con score 0..1 + estrategia (exact-slug · exact-name · contains · overlap · none)
+- `evaluateBudget()` — budget guard puro para VideoGen (reset diario/mensual · negative cost rejection)
+- `autoGradeAsset()` — A/B/C/UNRATED basado en resolución + metadata + tipo
+- Cost tables `IMAGE_LAB_COSTS` (9 ops) + `VIDEO_COST_PER_SECOND` (5 providers)
+
+**DriveSyncBot** ([src/lib/drive/sync-bot.ts](src/lib/drive/sync-bot.ts)):
+- **MOCK mode** activa con `DRIVE_MOCK_MODE=true` o sin Google credentials — genera 6 assets sintéticos por producto (3 folders × fotos + videos) con placeholders Picsum. UI funciona sin Drive real.
+- **Real mode** via `dynImport = new Function('m','return import(m)')` para que webpack no bundle googleapis/cloudinary (deps opcionales, se instalan solo cuando se activen credentials)
+- Prisma singleton (no `new PrismaClient()`)
+- Observability integrada (`captureException/captureWarning/captureEvent` con redacción automática de secretos)
+- Concurrencia limitada a 5 tasks paralelos
+- Idempotencia por `driveFileId` + `driveLastSyncAt` vs `modifiedTime`
+- Minimal typed interfaces para APIs dinámicas
+
+**ImageLab** ([src/lib/studio/image-lab.ts](src/lib/studio/image-lab.ts)):
+- 9 operaciones Cloudinary: 6 transforms reales (UPSCALE, OVERLAY_TEXT, BADGE, COLOR_ADJUST, AUTO_CROP, WATERMARK) + 3 con MOCK fallback si sin Replicate (REMOVE_BG → e_trim · REPLACE_BG → color sólido · GENERATE_VARIANT → cartoonify)
+- Cada operación registra `AssetEdit` con costUsd + durationMs
+- Opción `persistAsNewAsset` crea ProductAsset derivado
+
+**UGC Scriptwriter** ([src/lib/studio/ugc-scriptwriter.ts](src/lib/studio/ugc-scriptwriter.ts)):
+- **Reusa nuestro `@/lib/ai/llm-router`** (OpenAI + Claude Haiku opt-in) — sin deps nuevas
+- Output validado con Zod (`UgcPackageSchema`) — rechaza JSON malformado del LLM
+- System prompt profesional en ES-LATAM con reglas sanitarias (no promete curar)
+- Persiste en BD con `timesUsed` para ranking comunitario
+
+**APIs (6 endpoints):**
+- `GET|POST /api/drive/sync` — cron + trigger admin manual
+- `GET /api/drive/sync/status` — último run + detección MOCK mode
+- `GET /api/catalog/products/[id]/assets` — público-comunidad (APPROVED/FEATURED)
+- `GET /api/admin/assets?status=&productId=&limit=` — con counts agregados
+- `PATCH|DELETE /api/admin/assets/[id]` — aprobar/rechazar/feature/archivar
+- `POST /api/studio/image-lab` — rate-limit 20/min por usuario
+- `POST|GET /api/studio/ugc` — rate-limit 5/hora por usuario (protege costo LLM)
+
+Todas con `withErrorHandler` + Zod + session auth + `captureException`.
+
+**Hooks React Query** ([src/hooks/useStudio.ts](src/hooks/useStudio.ts)):
+- `useProductAssets`, `useAdminAssets`, `useUpdateAsset`, `useArchiveAsset`
+- `useDriveSyncStatus`, `useTriggerDriveSync`
+- `useRunImageLab`, `useGenerateUgc`
+- Metadata `ASSET_TYPE_LABEL` + `ASSET_STATUS_META` para UI
+
+**Admin UI** ([/admin/catalogo/assets](src/app/admin/catalogo/assets/page.tsx)):
+- Barra de sync con badge MOCK · botón "Sincronizar ahora" + último run (scanned/nuevos/updated/failed)
+- Filtros por status con counts (DRAFT · APPROVED · FEATURED · REJECTED · ARCHIVED)
+- Grid responsive con preview Cloudinary (imagen/video/PDF) + badges quality (A_PREMIUM/B_STANDARD/C_ACCEPTABLE) + angle
+- Acciones rápidas: Aprobar · Destacar · Rechazar · Archivar por card
+
+**Community UI** ([/producto/[id]](src/app/(community)/producto/[id]/page.tsx)):
+- Hero gallery con navegación ← → + thumbnails + counter + badge angle
+- Grid de videos con hover-play
+- Columna info con rating, CTA triple (Agregar a tienda / Share / Wishlist)
+- Beneficios Vitalcom + stats de assets
+
+**Cron Vercel:**
+- `/api/drive/sync` cada 2h (`0 */2 * * *`) — 11 crons totales
+
+**Tests:** 187/187 ✅ (+32 nuevos sobre helpers del studio)
+
+### Deferido a Phase B (v2.16.0)
+
+Por requerir deps externas + credenciales pendientes CEO + testing con costos reales:
+- **VideoMaker FFmpeg** — necesita binario ffmpeg en Vercel serverless (non-trivial)
+- **VideoGen multi-provider** (Pika/Runway/Veo/Sora) — requiere API keys + budget guard testing
+- **Shopify theme push** — bloqueado por OAuth Partner App
+- **Drive real mode** — activa con `npm install googleapis cloudinary` + service account JSON
+
+Todos listos para activar con flag de env, sin cambios de código.
+
+### Cómo activar modo real (cuando lleguen credentials)
+
+```bash
+npm install googleapis cloudinary
+# .env
+GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'
+DRIVE_ROOT_FOLDER_ID=<id de "CONTENIDO VITALCOM">
+# unset DRIVE_MOCK_MODE
+```
+
+Para ImageLab real:
+```bash
+npm install replicate
+REPLICATE_API_TOKEN=...
+```
+
+El código está diseñado para que el MOCK se desactive automáticamente cuando las credenciales estén presentes.
+
 ## [2.14.0] — 2026-04-22
 
 **QA pre-producción — cierre de todos los riesgos de la auditoría.**
