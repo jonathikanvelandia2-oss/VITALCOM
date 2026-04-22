@@ -6,6 +6,7 @@ import {
   useMyHealthScore, useRefreshMyHealthScore,
   SEGMENT_META, FACTOR_META, type HealthBreakdown,
 } from '@/hooks/useHealthScore'
+import { WeeklyInsightCard } from '@/components/community/WeeklyInsightCard'
 
 export default function MiScorePage() {
   const scoreQ = useMyHealthScore()
@@ -52,6 +53,11 @@ export default function MiScorePage() {
           <>
             {/* Score hero */}
             <ScoreHero data={data} />
+
+            {/* Weekly Insight (V34) — resumen IA accionable */}
+            <div className="mt-6">
+              <WeeklyInsightCard />
+            </div>
 
             {/* Breakdown */}
             <div className="mt-6">

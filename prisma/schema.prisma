@@ -154,6 +154,8 @@ model User {
   healthScore             UserHealthScore?
   // V33 — Product Studio (dropshipper-owned landings)
   productLandings         ProductLanding[]
+  // V34 — Weekly Insights proactivos
+  weeklyInsights          WeeklyInsight[]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -2280,4 +2282,54 @@ model VideoBudgetLimit {
   resetMonthly    DateTime
   alertsSent      Json     @default("[]")
   isActive        Boolean  @default(true)
+}
+
+// ═══════════════════════════════════════════════════════════
+// V34 — Weekly Insights (reporte IA semanal por VITALCOMMER)
+// ═══════════════════════════════════════════════════════════
+// Un insight por usuario por semana (lunes-domingo).
+// Unifica P&G + Health Score + alertas + recomendaciones en
+// una narrativa accionable. El dropshipper abre UNA cosa en
+// lugar de navegar 5 pantallas.
+model WeeklyInsight {
+  id                String             @id @default(cuid())
+  userId            String
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Rango temporal (inclusive)
+  weekStart         DateTime           // Lunes 00:00:00 UTC
+  weekEnd           DateTime           // Domingo 23:59:59 UTC
+  // Métricas P&G del período
+  revenue           Float              @default(0)
+  revenuePrev       Float              @default(0)
+  revenueDeltaPct   Float              @default(0)
+  orderCount        Int                @default(0)
+  orderCountPrev    Int                @default(0)
+  netProfit         Float              @default(0)
+  roas              Float              @default(0)
+  breakEvenRoas     Float              @default(0)
+  // Health Score snapshot
+  healthScore       Int                @default(0)
+  healthScorePrev   Int?
+  healthDelta       Int                @default(0)
+  segment           UserHealthSegment?
+  // Top producto de la semana
+  topProductId      String?
+  topProductName    String?
+  topProductSales   Int?
+  // Narrativa generada (sin LLM por defecto, pero compatible)
+  headline          String             // "Subiste 23% vs la semana pasada"
+  highlights        Json               @default("[]") // Array<{label, value, trend}>
+  recommendations   Json               @default("[]") // Array<{priority, title, action, href}>
+  // Benchmarking anónimo (opcional, se llena si hay suficientes peers)
+  tierAvgRevenue    Float?
+  tierPercentile    Int?               // 0-100 del usuario dentro de su segment
+  // Estado
+  generatedAt       DateTime           @default(now())
+  readAt            DateTime?
+  // Fuente (para auditar si vino de cron o de trigger manual)
+  source            String             @default("manual")
+
+  @@unique([userId, weekStart])
+  @@index([userId, weekStart(sort: Desc)])
+  @@index([weekStart])
 }

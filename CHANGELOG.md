@@ -1,5 +1,62 @@
 # Vitalcom Platform — Changelog
 
+## [2.18.0] — 2026-04-22
+
+**V34 — Weekly Insight Engine: unificación CEO-level de la semana del VITALCOMMER.**
+
+El problema: el dropshipper tenía que navegar 5 pantallas (P&G, Health Score, alertas, rendimiento, órdenes) para entender su semana y decidir qué hacer. Solución: un insight semanal que UNIFICA todo en una narrativa accionable con 3 recomendaciones priorizadas por impacto.
+
+### Schema ([prisma/schema.prisma](prisma/schema.prisma))
+Nuevo modelo `WeeklyInsight` — uno por usuario/semana (unique `(userId, weekStart)`):
+- Métricas P&G (revenue/orders/netProfit/ROAS/breakEven) con comparativa vs semana previa
+- Health Score snapshot + delta
+- Top producto de la semana
+- `headline` (string narrativo) + `highlights` (JSON métricas) + `recommendations` (JSON priorizado)
+- Campos de benchmarking (`tierAvgRevenue`, `tierPercentile`) reservados para v2.19
+
+### Helpers puros ([src/lib/insights/helpers.ts](src/lib/insights/helpers.ts)) — **35 tests** ✅
+- `getWeekBounds(date)` — ventana ISO lunes-domingo en UTC (determinística cross-timezone)
+- `getPreviousWeekBounds(start)` — ventana previa, consecutiva exacta (prev.end + 1ms = current.start)
+- `deltaPercent(current, prev)` — con edge cases (cero→cero=0, cero→positivo=+100, positivo→cero=-100, redondeo a 1 decimal)
+- `generateHeadline(input)` — narrativa priorizada: revenue drástico > salto health > cambio moderado > estabilidad > caso sin ventas
+- `generateHighlights(input)` — cards métricos con trend (up/down/flat/none) + formato dinero compacto (1.5k / 2.3M)
+- `generateRecommendations(input)` — hasta 3 bullets ordenados critical→high→medium→low con `title` + `action` + `href`
+
+### Service ([src/lib/insights/service.ts](src/lib/insights/service.ts))
+- `generateWeeklyInsight({userId, asOf, source})` — orquestador:
+  - Paraleliza: P&G snapshot actual + previo + Health Score + notificaciones no-leídas + top producto + Shopify connected
+  - Reutiliza `getSnapshot()` del V26 (sin duplicar lógica)
+  - Upsert idempotente por `(userId, weekStart)` — re-generar la misma semana solo actualiza narrativa
+  - Narrativa **determinística** (sin LLM) — ahorra costos + asegura consistencia. Hook preparado para añadir LLM router como overlay futuro
+  - `captureEvent('insights.weekly.generated')` con metadata
+- `getLatestInsight(userId)` y `markInsightAsRead(userId, id)` helpers
+
+### API ([src/app/api/insights/me/route.ts](src/app/api/insights/me/route.ts))
+- `GET /api/insights/me` — último insight (genera on-demand si no existe para la semana actual)
+- `POST /api/insights/me` — fuerza regeneración (rate-limited 3/hora con `guardRateLimit`)
+
+### UI
+- Hook `useMyWeeklyInsight()` + `useRegenerateWeeklyInsight()` ([src/hooks/useInsights.ts](src/hooks/useInsights.ts))
+- Componente `WeeklyInsightCard` ([src/components/community/WeeklyInsightCard.tsx](src/components/community/WeeklyInsightCard.tsx)):
+  - Header con "Tu semana IA" + rango fechas + headline prominente
+  - Grid de highlights con trend icons
+  - 3 recomendaciones clickables con priority badges (critical/high/medium/low)
+  - Botón refresh (recalcula in-place con spinner)
+- Integrado en [/mi-score](src/app/(community)/mi-score/page.tsx) entre ScoreHero y el breakdown de factores
+
+### Tests totales
+- Antes: 317/317 ✅
+- Después: **352/352 ✅** (+35)
+
+### Pendiente (siguiente sprint v2.19)
+- **Cron dominical 9am UTC** — `POST /api/insights/cron` que corre `generateWeeklyInsight` para todos los users activos (segment != NEW)
+- **Benchmarking tier percentile** — llenar `tierAvgRevenue` y `tierPercentile` aggregando anónimos por segment
+- **Página dedicada /insights** — vista completa + histórico de insights pasados
+- **Notification automática** cuando se genera el insight (para que los users lo vean)
+- **Overlay LLM opcional** — enriquecer `headline` con agente CEOAdvisor cuando hay datos suficientes
+
+---
+
 ## [2.17.0] — 2026-04-22
 
 **Pre-producción: compliance + abuse protection + ops observability.**
