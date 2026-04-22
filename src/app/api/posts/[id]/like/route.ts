@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { awardPoints } from '@/lib/gamification/points'
+import { guardRateLimit } from '@/lib/security/rate-limit'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -9,6 +10,11 @@ type Ctx = { params: Promise<{ id: string }> }
 // Si ya dio like, lo quita. Si no, lo da.
 export const POST = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   const session = await requireSession()
+
+  // 60 toggles / min — suficiente para uso normal, corta scripts abusivos
+  const blocked = guardRateLimit(`like:${session.id}`, { maxRequests: 60, windowMs: 60_000 })
+  if (blocked) return blocked
+
   const { id: postId } = await ctx!.params
 
   const post = await prisma.post.findUnique({ where: { id: postId } })

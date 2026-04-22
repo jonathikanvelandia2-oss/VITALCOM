@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { apiError, apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/db/prisma'
-import { WaTemplateStatus } from '@prisma/client'
+import { WaTemplateCategory, WaTemplateStatus } from '@prisma/client'
+import { ensureMarketingOptOut } from '@/lib/whatsapp/opt-out'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,13 +49,39 @@ export const PATCH = withErrorHandler(async (req: Request, ctx: { params: { id: 
   const body = await req.json()
   const data = patchSchema.parse(body)
 
+  // V30.1 — si la plantilla es MARKETING y cambia body/footer, revalidar opt-out.
+  // Protege compliance cuando el user edita después del create (Meta exige disclosure).
+  let finalBody = data.bodyText
+  let finalFooter = data.footerText
+  let optOutInjected = false
+  let optOutTarget: 'footer' | 'body' | 'none' = 'none'
+
+  const touchesMarketingContent =
+    template.category === WaTemplateCategory.MARKETING
+    && (data.bodyText !== undefined || data.footerText !== undefined)
+
+  if (touchesMarketingContent) {
+    const fixed = ensureMarketingOptOut({
+      bodyText: data.bodyText ?? template.bodyText,
+      footerText: data.footerText !== undefined ? data.footerText : template.footerText,
+    })
+    // Solo sobreescribimos si en efecto se modificó; si el usuario no tocó un
+    // campo, respetamos el valor original (no lo forzamos a aparecer en el SET).
+    if (fixed.modified) {
+      if (fixed.target === 'body' || data.bodyText !== undefined) finalBody = fixed.bodyText
+      if (fixed.target === 'footer' || data.footerText !== undefined) finalFooter = fixed.footerText ?? undefined
+      optOutInjected = true
+      optOutTarget = fixed.target
+    }
+  }
+
   const updated = await prisma.whatsappTemplate.update({
     where: { id: ctx.params.id },
     data: {
-      ...(data.bodyText !== undefined && { bodyText: data.bodyText }),
+      ...(finalBody !== undefined && { bodyText: finalBody }),
       ...(data.headerType !== undefined && { headerType: data.headerType }),
       ...(data.headerContent !== undefined && { headerContent: data.headerContent }),
-      ...(data.footerText !== undefined && { footerText: data.footerText }),
+      ...(finalFooter !== undefined && { footerText: finalFooter }),
       ...(data.buttons !== undefined && { buttons: data.buttons as never }),
       ...(data.variantGroup !== undefined && { variantGroup: data.variantGroup }),
       ...(data.weight !== undefined && { weight: data.weight }),
@@ -65,7 +92,7 @@ export const PATCH = withErrorHandler(async (req: Request, ctx: { params: { id: 
     },
   })
 
-  return apiSuccess({ id: updated.id })
+  return apiSuccess({ id: updated.id, optOutInjected, optOutTarget })
 })
 
 export const DELETE = withErrorHandler(async (_req: Request, ctx: { params: { id: string } }) => {

@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { startWorkflow } from '@/lib/flows/workflow-engine'
 import { rateLimitWebhook, getClientKey } from '@/lib/security/rate-limit-webhook'
+import { captureEvent } from '@/lib/observability'
 import { WaWorkflowTrigger } from '@prisma/client'
 import crypto from 'crypto'
 
@@ -123,7 +124,7 @@ async function handleOrderCreated(userId: string, order: ShopifyOrderPayload): P
   // Buscar workflows AUTO_CONFIRMATION activos del userId
   const phone = order.shipping_address?.phone ?? order.customer?.phone ?? order.phone
   if (!phone) {
-    console.log('[webhooks/shopify] order sin teléfono, skip')
+    captureEvent('shopify.order.no_phone', { userId, extra: { orderId: order.id } })
     return
   }
 

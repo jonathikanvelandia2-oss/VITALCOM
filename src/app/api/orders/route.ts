@@ -4,6 +4,7 @@ import { requireSession } from '@/lib/auth/session'
 import { createOrderSchema, orderFiltersSchema } from '@/lib/api/schemas/order'
 import { OrderRepository } from '@/lib/repositories/order-repository'
 import { sendOrderConfirmationEmail } from '@/lib/email'
+import { guardRateLimit } from '@/lib/security/rate-limit'
 import { Prisma } from '@prisma/client'
 
 // ── GET /api/orders — Listado paginado con filtros ──────
@@ -56,6 +57,11 @@ export const GET = withErrorHandler(async (req: Request) => {
 // Auto-genera número VC-CO-20260414-0001
 export const POST = withErrorHandler(async (req: Request) => {
   const session = await requireSession()
+
+  // 40 pedidos / 10min por usuario — suficiente para cualquier uso legítimo,
+  // protege contra scripts que inyecten ruido en OrderRepository.countForToday
+  const blocked = guardRateLimit(`orders:create:${session.id}`, { maxRequests: 40, windowMs: 10 * 60_000 })
+  if (blocked) return blocked
 
   const body = await req.json()
   const data = createOrderSchema.parse(body)

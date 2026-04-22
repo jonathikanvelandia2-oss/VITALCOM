@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { requireRole } from '@/lib/auth/session'
+import { requireRole, requireSession } from '@/lib/auth/session'
 import { captureException } from '@/lib/observability'
+import { guardRateLimit } from '@/lib/security/rate-limit'
 
 export const runtime = 'nodejs'
 
@@ -11,14 +12,26 @@ const MAX_VIDEO_SIZE = 50 * 1024 * 1024
 // ── POST /api/upload — Subir archivo a Supabase Storage ─
 export async function POST(req: Request) {
   try {
+    const session = await requireSession()
     await requireRole('EMPLOYEE')
 
+    // 30 uploads / 5min por usuario — previene storage-bomb abusivo
+    const blocked = guardRateLimit(`upload:${session.id}`, { maxRequests: 30, windowMs: 5 * 60_000 })
+    if (blocked) return blocked
+
+    // Hardening: fallar con 503 en vez de crashear si faltan env vars en prod
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !serviceKey) {
+      captureException(new Error('Supabase env vars missing'), { route: '/api/upload' })
+      return NextResponse.json(
+        { ok: false, error: 'Servicio de storage no configurado', code: 'STORAGE_NOT_CONFIGURED' },
+        { status: 503 },
+      )
+    }
+
     const { createClient } = await import('@supabase/supabase-js')
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
-    )
+    const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
     const formData = await req.formData()
     const file = formData.get('file') as File | null
@@ -63,7 +76,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`
 
     return NextResponse.json({
       ok: true,

@@ -94,3 +94,31 @@ export function rateLimitHeaders(result: RateLimitResult): Record<string, string
     ...(result.success ? {} : { 'Retry-After': String(Math.ceil((result.resetAt - Date.now()) / 1000)) }),
   }
 }
+
+/**
+ * Guard de una línea para endpoints API. Retorna `null` si pasa el límite
+ * (continuar con el handler) o un `NextResponse` 429 listo para devolver.
+ * Usa NextResponse para ser compatible con withErrorHandler.
+ *
+ * Uso:
+ *   const blocked = guardRateLimit(`posts:${session.id}`, RATE_LIMITS.api)
+ *   if (blocked) return blocked
+ */
+// NextResponse.json devuelve un NextResponse compatible con el tipado de los handlers.
+import { NextResponse } from 'next/server'
+
+export function guardRateLimit(
+  identifier: string,
+  config: RateLimitConfig,
+  message = 'Demasiadas peticiones · espera un momento',
+): NextResponse | null {
+  const result = rateLimit(identifier, config)
+  if (result.success) return null
+  return NextResponse.json(
+    { ok: false, error: message, code: 'RATE_LIMITED' },
+    {
+      status: 429,
+      headers: rateLimitHeaders(result),
+    },
+  )
+}

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apiError, apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/db/prisma'
+import { guardRateLimit } from '@/lib/security/rate-limit'
 import { ProactiveAlertChannel, ProactiveAlertType } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -36,6 +37,11 @@ export const GET = withErrorHandler(async () => {
 
 export const POST = withErrorHandler(async (req: Request) => {
   const session = await requireSession()
+
+  // 10 alertas creadas / hora — una regla anti-spam para config masiva
+  const blocked = guardRateLimit(`alerts:create:${session.id}`, { maxRequests: 10, windowMs: 60 * 60_000 })
+  if (blocked) return blocked
+
   const body = await req.json()
   const data = createSchema.parse(body)
 

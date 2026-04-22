@@ -3,6 +3,7 @@ import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { createCommentSchema } from '@/lib/api/schemas/post'
 import { awardPoints } from '@/lib/gamification/points'
+import { guardRateLimit } from '@/lib/security/rate-limit'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -32,6 +33,11 @@ export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
 // ── POST /api/posts/[id]/comments — Crear comentario ───
 export const POST = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   const session = await requireSession()
+
+  // 20 comentarios / 5min — evita flood en un hilo
+  const blocked = guardRateLimit(`comment:${session.id}`, { maxRequests: 20, windowMs: 5 * 60_000 })
+  if (blocked) return blocked
+
   const { id: postId } = await ctx!.params
 
   const post = await prisma.post.findUnique({ where: { id: postId } })

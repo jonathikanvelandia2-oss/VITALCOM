@@ -247,7 +247,14 @@ async function runRealSync(syncRunId: string, rootFolderId: string): Promise<Dri
   const google = googleapis.google
   const cloudinary = cloudinaryMod.v2
 
-  const serviceAccount = JSON.parse(process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON!)
+  const saJson = process.env.GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON
+  if (!saJson) {
+    throw new Error(
+      'DriveSyncBot real mode requiere GOOGLE_DRIVE_SERVICE_ACCOUNT_JSON. ' +
+      'Setea DRIVE_MOCK_MODE=true o agrega la credencial.',
+    )
+  }
+  const serviceAccount = JSON.parse(saJson)
   const auth = new google.auth.JWT({
     email: serviceAccount.client_email,
     key: serviceAccount.private_key,

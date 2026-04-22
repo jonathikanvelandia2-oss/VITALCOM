@@ -3,6 +3,7 @@ import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { createPostSchema, postFiltersSchema } from '@/lib/api/schemas/post'
 import { awardPoints } from '@/lib/gamification/points'
+import { guardRateLimit } from '@/lib/security/rate-limit'
 
 // ── GET /api/posts — Feed paginado ─────────────────────
 export const GET = withErrorHandler(async (req: Request) => {
@@ -64,6 +65,10 @@ export const GET = withErrorHandler(async (req: Request) => {
 // ── POST /api/posts — Crear post ────────────────────────
 export const POST = withErrorHandler(async (req: Request) => {
   const session = await requireSession()
+
+  // 10 posts / 5 min — protege el feed contra spam
+  const blocked = guardRateLimit(`post:create:${session.id}`, { maxRequests: 10, windowMs: 5 * 60_000 })
+  if (blocked) return blocked
 
   const body = await req.json()
   const data = createPostSchema.parse(body)

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/db/prisma'
+import { guardRateLimit } from '@/lib/security/rate-limit'
 import { WaWorkflowTrigger } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
@@ -67,6 +68,11 @@ export const GET = withErrorHandler(async (req: Request) => {
 
 export const POST = withErrorHandler(async (req: Request) => {
   const session = await requireSession()
+
+  // 5 workflows nuevos / 10 min — suficiente para crear múltiples, protege de scripts
+  const blocked = guardRateLimit(`workflows:create:${session.id}`, { maxRequests: 5, windowMs: 10 * 60_000 })
+  if (blocked) return blocked
+
   const body = await req.json()
   const data = createSchema.parse(body)
 

@@ -3,6 +3,7 @@ import { apiError, apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { prisma } from '@/lib/db/prisma'
 import { upsertUserHealthScore } from '@/lib/health/service'
+import { guardRateLimit } from '@/lib/security/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,11 @@ export const GET = withErrorHandler(async () => {
 // POST — recalcula a demanda (para "Refrescar mi score")
 export const POST = withErrorHandler(async () => {
   const session = await requireSession()
+
+  // 5 recálculos / 10min — el cron diario ya corre, esto es solo refresh manual
+  const blocked = guardRateLimit(`health:refresh:${session.id}`, { maxRequests: 5, windowMs: 10 * 60_000 })
+  if (blocked) return blocked
+
   const result = await upsertUserHealthScore(session.id)
   if (!result) return apiError('No se pudo calcular', 500, 'HEALTH_ERROR')
   return apiSuccess({

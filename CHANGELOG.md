@@ -1,5 +1,62 @@
 # Vitalcom Platform — Changelog
 
+## [2.17.0] — 2026-04-22
+
+**Pre-producción: compliance + abuse protection + ops observability.**
+
+Auditoría Q&A previa al go-live con 1,500 VITALCOMMERS detectó 6 riesgos reales:
+compliance parcial en PATCH template MARKETING, 8 endpoints sin rate limit,
+3 env assertions que crashean en prod, sin endpoint de status, console.logs
+operacionales sin estructura. Esta release cierra los 6.
+
+### Compliance — opt-out PATCH ([src/app/api/whatsapp/templates/[id]/route.ts](src/app/api/whatsapp/templates/[id]/route.ts))
+- POST ya auto-appendaba opt-out (V30.1), **PATCH no lo hacía** — gap Meta compliance
+- Ahora si se edita body/footer de una template MARKETING, se revalida opt-out
+- Respuesta incluye `optOutInjected` + `optOutTarget` igual que POST
+- Respeta valores no tocados (no fuerza update completo, solo los campos modificados)
+
+### Rate limiting — 8 endpoints críticos protegidos ([src/lib/security/rate-limit.ts](src/lib/security/rate-limit.ts))
+Nuevo helper `guardRateLimit()` (una línea, retorna NextResponse 429 o null):
+- `POST /api/posts` — 10 / 5min (spam feed)
+- `POST /api/posts/[id]/comments` — 20 / 5min (flood hilos)
+- `POST /api/posts/[id]/like` — 60 / 1min (like-bots)
+- `POST /api/orders` — 40 / 10min (integridad countForToday)
+- `POST /api/upload` — 30 / 5min (storage-bomb)
+- `POST /api/alerts` — 10 / 1h (config massive)
+- `POST /api/workflows` — 5 / 10min (resource exhaustion)
+- `POST /api/health` — 5 / 10min (recálculos manuales)
+
+### Env hardening
+- `upload/route.ts` — reemplazados 2 assertions `!` por 503 graceful cuando faltan Supabase envs
+- `drive/sync-bot.ts:250` — throw con mensaje accionable en lugar de TypeError críptico
+
+### Ops — /api/status ([src/app/api/status/route.ts](src/app/api/status/route.ts))
+Endpoint público agnóstico para UptimeRobot / BetterUptime:
+- Check database con timeout 3s + latency tracking
+- Check envs requeridas (DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_SUPABASE_URL)
+- Build info (commit SHA desde VERCEL_GIT_COMMIT_SHA)
+- Devuelve 503 si algo crítico falla (detección automática externa)
+- NO expone valores de env, solo nombres faltantes
+
+### Console.log cleanup
+- `webhooks/shopify/route.ts` — operacional "order sin teléfono" migrado a `captureEvent()`
+- Mocks (whatsapp, alerts) mantienen `console.log` — solo disparan con MOCK_MODE=true (no contaminan prod real)
+
+### Tests nuevos
+- `src/lib/security/__tests__/rate-limit.test.ts` — **17 tests** (window reset, aislamiento, guardRateLimit 429, presets)
+- Usa vitest `useFakeTimers` para probar expiración de ventana determinísticamente
+
+### Tests totales
+- Antes: 300/300 ✅
+- Después: **317/317 ✅** (+17)
+
+### Pendiente (próximo sprint)
+- Phase B V33 (VideoMaker FFmpeg, VideoGen, Shopify push) — bloqueado credenciales CEO
+- Weekly Insights Engine — reporte IA personalizado semanal por dropshipper
+- SEO metadata en 75 pages (opcional según estrategia privacy)
+
+---
+
 ## [2.16.0] — 2026-04-22
 
 **Cobertura crítica — 4 módulos antes sin tests ahora cubiertos.**
