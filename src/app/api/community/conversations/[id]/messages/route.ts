@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, apiError, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { createNotification } from '@/lib/notifications/service'
+import { captureException } from '@/lib/observability'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -135,7 +136,13 @@ export const POST = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     body: preview,
     link: `/chat?c=${conversationId}`,
     meta: { conversationId, senderId: me },
-  }).catch(() => {})
+  }).catch(err =>
+    captureException(err, {
+      route: '/api/community/conversations/[id]/messages',
+      tags: { stage: 'notify' },
+      extra: { conversationId, recipientId },
+    }),
+  )
 
   return apiSuccess({
     id: message.id,

@@ -92,8 +92,16 @@ export default function RegisterPage() {
         return
       }
 
-      // Registro exitoso — redirigir a login
-      router.push('/login/comunidad?registered=true')
+      // Registro exitoso — redirigir a login. Si router.push falla por
+      // alguna razón (p.ej. navegación abortada), caemos a window.location
+      // para que el usuario no quede en limbo.
+      try {
+        router.push('/login/comunidad?registered=true')
+      } catch {
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login/comunidad?registered=true'
+        }
+      }
     } catch {
       setError('Error de conexión. Intenta de nuevo.')
       setLoading(false)

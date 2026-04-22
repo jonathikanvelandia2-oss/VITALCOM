@@ -3,7 +3,8 @@ import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, apiError, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { ShopifyClient, type ShopifyProductInput } from '@/lib/integrations/shopify/client'
-import { rateLimit, RATE_LIMITS, rateLimitHeaders } from '@/lib/security/rate-limit'
+import { rateLimit, rateLimitHeaders } from '@/lib/security/rate-limit'
+import { captureException } from '@/lib/observability'
 import { NextResponse } from 'next/server'
 
 // ── POST /api/shopify/sync-products ────────────────────
@@ -51,6 +52,27 @@ export const POST = withErrorHandler(async (req: Request) => {
     where: { id: { in: data.productIds }, active: true },
   })
 
+  // Batch lookup de ProductSync existente (1 query vs N antes)
+  const existingSyncs = await prisma.productSync.findMany({
+    where: {
+      shopifyStoreId: store.id,
+      productId: { in: products.map(p => p.id) },
+    },
+  })
+  const syncByProductId = new Map(existingSyncs.map(s => [s.productId, s]))
+
+  // Batch lookup de Stock real en el país del dropshipper. Si no tiene
+  // país asignado en su perfil, asumimos CO (sede principal).
+  const userCountry = session.country ?? 'CO'
+  const stocks = await prisma.stock.findMany({
+    where: {
+      productId: { in: products.map(p => p.id) },
+      country: userCountry,
+    },
+    select: { productId: true, quantity: true },
+  })
+  const stockByProductId = new Map(stocks.map(s => [s.productId, s.quantity]))
+
   const results: SyncResult[] = []
 
   for (const product of products) {
@@ -60,15 +82,8 @@ export const POST = withErrorHandler(async (req: Request) => {
         product.precioPublico ??
         product.precioComunidad
 
-      // Verificar si ya está sincronizado
-      const existing = await prisma.productSync.findUnique({
-        where: {
-          shopifyStoreId_productId: {
-            shopifyStoreId: store.id,
-            productId: product.id,
-          },
-        },
-      })
+      const existing = syncByProductId.get(product.id)
+      const realStock = stockByProductId.get(product.id) ?? 0
 
       const input: ShopifyProductInput = {
         title: product.name,
@@ -76,14 +91,14 @@ export const POST = withErrorHandler(async (req: Request) => {
         vendor: product.marca || 'Vitalcom',
         product_type: product.category || 'Suplemento',
         tags: (product.tags || []).join(', '),
-        status: 'active',
+        status: realStock > 0 ? 'active' : 'draft', // pausa si sin stock
         images: (product.images || []).slice(0, 5).map((src) => ({ src })),
         variants: [
           {
             price: sellingPrice.toFixed(2),
             sku: product.sku,
             inventory_management: 'shopify',
-            inventory_quantity: 100, // placeholder hasta webhook de stock
+            inventory_quantity: realStock, // stock real del país del dropshipper
             weight: product.weight || undefined,
             weight_unit: 'g',
           },
@@ -127,8 +142,14 @@ export const POST = withErrorHandler(async (req: Request) => {
       results.push({ productId: product.id, sku: product.sku, ok: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
-      console.error('[sync-products] fallo en producto', { sku: product.sku, err: message })
-      results.push({ productId: product.id, sku: product.sku, ok: false, error: message })
+      captureException(err, {
+        route: '/api/shopify/sync-products',
+        userId: session.id,
+        tags: { stage: 'per-product' },
+        extra: { sku: product.sku, productId: product.id },
+      })
+      // El mensaje al cliente no filtra detalles — solo un indicador de fallo
+      results.push({ productId: product.id, sku: product.sku, ok: false, error: 'sync_failed' })
     }
   }
 

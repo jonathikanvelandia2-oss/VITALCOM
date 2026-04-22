@@ -32,17 +32,16 @@ export const GET = withErrorHandler(async (req: Request) => {
       },
       _sum: { spend: true, clicks: true, conversions: true },
     }),
-    // Serie diaria últimos N días
-    prisma.$queryRaw<Array<{ day: Date; spend: number }>>`
-      SELECT DATE("AdSpendEntry"."date") AS day, SUM("spend") AS spend
-      FROM "AdSpendEntry"
-      JOIN "AdAccount" ON "AdAccount"."id" = "AdSpendEntry"."accountId"
-      WHERE "AdAccount"."userId" = ${session.id}
-        AND "AdAccount"."active" = true
-        AND "AdSpendEntry"."date" >= ${start}
-      GROUP BY day
-      ORDER BY day ASC
-    `,
+    // Serie diaria últimos N días (tipado con groupBy en lugar de $queryRaw)
+    prisma.adSpendEntry.groupBy({
+      by: ['date'],
+      where: {
+        account: { userId: session.id, active: true },
+        date: { gte: start },
+      },
+      _sum: { spend: true },
+      orderBy: { date: 'asc' },
+    }),
     // Ingresos de órdenes (entregadas) del periodo — para ROAS
     prisma.order.aggregate({
       where: {
@@ -106,9 +105,9 @@ export const GET = withErrorHandler(async (req: Request) => {
       conversions: v.conversions,
       share: totalSpend > 0 ? (v.spend / totalSpend) * 100 : 0,
     })),
-    dailySpend: (spendSeries as Array<{ day: Date; spend: number | string }>).map((r) => ({
-      day: r.day,
-      spend: typeof r.spend === 'string' ? parseFloat(r.spend) : r.spend,
+    dailySpend: spendSeries.map((r) => ({
+      day: r.date,
+      spend: r._sum.spend ?? 0,
     })),
   })
 })

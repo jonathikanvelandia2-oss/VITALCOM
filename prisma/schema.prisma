@@ -257,6 +257,9 @@ model Order {
   @@index([userId, createdAt])
   @@index([userId, status])
   @@index([status, createdAt])
+  @@index([externalRef])
+  @@index([source, createdAt])
+  @@index([country, createdAt])
 }
 
 model OrderItem {
@@ -320,6 +323,10 @@ model Post {
   comments  Comment[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+
+  @@index([authorId, createdAt])
+  @@index([category, createdAt])
+  @@index([pinned, createdAt])
 }
 
 model PostLike {
@@ -1650,6 +1657,8 @@ model WhatsappContact {
 
   @@unique([accountId, phoneE164])
   @@index([accountId, segment])
+  @@index([accountId, isOptedIn])
+  @@index([accountId, shippingCountry])
 }
 
 model WhatsappConversation {

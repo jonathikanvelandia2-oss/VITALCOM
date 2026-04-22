@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { ZodError } from 'zod'
+import { captureException } from '@/lib/observability'
 
 // ── Helpers de respuesta API ─────────────────────────────
 // Formato consistente para todas las API routes de Vitalcom.
@@ -61,8 +62,13 @@ export function withErrorHandler(
         }
       }
 
-      // Error interno
-      console.error('[API Error]', error)
+      // Error interno — reportar con contexto sin filtrar al cliente
+      const route = req.url ? new URL(req.url).pathname : undefined
+      captureException(error, {
+        route,
+        tags: { surface: 'api' },
+        extra: { method: req.method },
+      })
       return apiError('Error interno del servidor', 500, 'INTERNAL_ERROR')
     }
   }

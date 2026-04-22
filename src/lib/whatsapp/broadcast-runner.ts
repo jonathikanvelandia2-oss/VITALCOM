@@ -28,34 +28,62 @@ interface SegmentFilter {
   onlyOptedIn?: boolean      // default true
 }
 
-// Resuelve los contactos que matchean el filtro
+// Tamaño máximo absoluto (protección contra broadcasts masivos que
+// podrían saturar memoria en una sola request serverless).
+const MAX_RECIPIENTS = 5000
+// Cursor page size — paginamos para no cargar todo en memoria.
+const RESOLVE_CHUNK = 500
+
+// Resuelve los contactos que matchean el filtro.
+// Usa cursor-pagination para procesar en chunks, evitando cargar
+// miles de filas de una sola vez (causaba picos de memoria en Vercel).
 export async function resolveRecipients(
   accountId: string,
   filter: SegmentFilter,
 ): Promise<Array<{ id: string; phoneE164: string; firstName: string | null; tags: unknown }>> {
-  const contacts = await prisma.whatsappContact.findMany({
-    where: {
-      accountId,
-      ...(filter.onlyOptedIn !== false ? { isOptedIn: true } : {}),
-      ...(filter.segment ? { segment: filter.segment } : {}),
-      ...(filter.country ? { shippingCountry: filter.country } : {}),
-      ...(filter.minLtv != null ? { lifetimeValue: { gte: filter.minLtv } } : {}),
-    },
-    select: { id: true, phoneE164: true, firstName: true, tags: true },
-    take: 5000, // guardia razonable
-  })
+  const where = {
+    accountId,
+    ...(filter.onlyOptedIn !== false ? { isOptedIn: true } : {}),
+    ...(filter.segment ? { segment: filter.segment } : {}),
+    ...(filter.country ? { shippingCountry: filter.country } : {}),
+    ...(filter.minLtv != null ? { lifetimeValue: { gte: filter.minLtv } } : {}),
+  }
 
-  // Filtro de tags en memoria (porque son JSON)
   const includeTags = filter.tags ?? []
   const excludeTags = filter.excludeTags ?? []
+  const needsTagFilter = includeTags.length > 0 || excludeTags.length > 0
 
-  return contacts.filter(c => {
-    const tagList = Array.isArray(c.tags) ? c.tags as Array<{ key?: string }> : []
-    const keys = tagList.map(t => t?.key).filter(Boolean) as string[]
-    if (includeTags.length > 0 && !includeTags.some(t => keys.includes(t))) return false
-    if (excludeTags.length > 0 && excludeTags.some(t => keys.includes(t))) return false
-    return true
-  })
+  const out: Array<{ id: string; phoneE164: string; firstName: string | null; tags: unknown }> = []
+  let cursor: string | undefined
+  while (out.length < MAX_RECIPIENTS) {
+    const batch = await prisma.whatsappContact.findMany({
+      where,
+      select: { id: true, phoneE164: true, firstName: true, tags: true },
+      orderBy: { id: 'asc' },
+      take: RESOLVE_CHUNK,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    })
+    if (batch.length === 0) break
+
+    const filtered = needsTagFilter
+      ? batch.filter(c => {
+          const tagList = Array.isArray(c.tags) ? c.tags as Array<{ key?: string }> : []
+          const keys = tagList.map(t => t?.key).filter(Boolean) as string[]
+          if (includeTags.length > 0 && !includeTags.some(t => keys.includes(t))) return false
+          if (excludeTags.length > 0 && excludeTags.some(t => keys.includes(t))) return false
+          return true
+        })
+      : batch
+
+    for (const r of filtered) {
+      out.push(r)
+      if (out.length >= MAX_RECIPIENTS) break
+    }
+
+    cursor = batch[batch.length - 1]!.id
+    if (batch.length < RESOLVE_CHUNK) break
+  }
+  return out
 }
 
 // Crea recipients + asigna variante A/B

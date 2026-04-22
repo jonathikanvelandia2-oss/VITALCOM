@@ -11,7 +11,16 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error('[vitalcom:error-boundary]', error)
+    // Reportar con digest Next.js para correlacionar con server logs
+    fetch('/api/observability/client-error', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        surface: 'root',
+        message: error.message,
+        digest: error.digest,
+      }),
+    }).catch(() => {})
   }, [error])
 
   return (

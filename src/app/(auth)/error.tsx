@@ -12,7 +12,15 @@ export default function AuthError({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error('[vitalcom:auth:error-boundary]', error)
+    fetch('/api/observability/client-error', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        surface: 'auth',
+        message: error.message,
+        digest: error.digest,
+      }),
+    }).catch(() => {})
   }, [error])
 
   return (

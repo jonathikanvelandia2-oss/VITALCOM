@@ -31,28 +31,43 @@ export class ShopifyClient {
     path: string,
     body?: unknown
   ): Promise<T> {
-    const res = await fetch(`${this.baseUrl()}${path}`, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        'X-Shopify-Access-Token': this.accessToken,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      cache: 'no-store',
-    })
+    // Timeout manual para evitar requests colgados que bloquean la
+    // función serverless. 15s es suficiente para Shopify incluso bajo carga.
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15_000)
 
-    if (res.status === 429) {
-      throw new Error('SHOPIFY_RATE_LIMITED')
+    try {
+      const res = await fetch(`${this.baseUrl()}${path}`, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Shopify-Access-Token': this.accessToken,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        cache: 'no-store',
+        signal: controller.signal,
+      })
+
+      if (res.status === 429) {
+        throw new Error('SHOPIFY_RATE_LIMITED')
+      }
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        throw new Error(`SHOPIFY_${method}_FAILED: ${res.status} ${text.slice(0, 200)}`)
+      }
+
+      if (res.status === 204) return {} as T
+      return (await res.json()) as T
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw new Error('SHOPIFY_TIMEOUT')
+      }
+      throw err
+    } finally {
+      clearTimeout(timeoutId)
     }
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '')
-      throw new Error(`SHOPIFY_${method}_FAILED: ${res.status} ${text.slice(0, 200)}`)
-    }
-
-    if (res.status === 204) return {} as T
-    return (await res.json()) as T
   }
 
   // ── Helpers de alto nivel ─────────────────────────────

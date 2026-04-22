@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { LifeBuoy, Send, Loader2, Sparkles, User, Bot } from 'lucide-react'
 import { CommunityTopbar } from '@/components/community/CommunityTopbar'
 import { useSoporteChat, type ChatMessage } from '@/hooks/useSoporteIA'
+import { formatInlineMarkdown as _formatInlineMarkdown } from '@/lib/markdown/inline'
 
 // ── SoporteIA — V22 · 7° agente IA (chat 24/7) ───────────
 // Chat conversacional para los VITALCOMMERS con contexto:
@@ -266,18 +267,14 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   )
 }
 
-// Minimal markdown: **bold** + /rutas clickables + backticks como code
-function formatInlineMarkdown(text: string): string {
-  const escaped = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+// Estilos Vitalcom para el parser inline markdown. La lógica y las
+// pruebas viven en @/lib/markdown/inline.ts — aquí solo decoramos.
+const MARKDOWN_STYLES = {
+  strong: 'color:var(--vc-lime-main)',
+  code: 'background:rgba(198,255,60,0.12);padding:1px 5px;border-radius:3px;font-family:var(--font-mono);font-size:0.9em;',
+  link: 'color:var(--vc-lime-main);text-decoration:underline;text-underline-offset:2px',
+} as const
 
-  return escaped
-    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--vc-lime-main)">$1</strong>')
-    .replace(/`([^`]+)`/g, '<code style="background:rgba(198,255,60,0.12);padding:1px 5px;border-radius:3px;font-family:var(--font-mono);font-size:0.9em;">$1</code>')
-    .replace(
-      /(\s|^)(\/[a-z\-]+(?:\/[a-z\-0-9]+)*)/g,
-      '$1<a href="$2" style="color:var(--vc-lime-main);text-decoration:underline;text-underline-offset:2px">$2</a>',
-    )
+function formatInlineMarkdown(text: string): string {
+  return _formatInlineMarkdown(text, { style: MARKDOWN_STYLES })
 }

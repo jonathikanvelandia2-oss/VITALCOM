@@ -12,7 +12,15 @@ export default function CommunityError({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error('[vitalcom:community:error-boundary]', error)
+    fetch('/api/observability/client-error', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        surface: 'community',
+        message: error.message,
+        digest: error.digest,
+      }),
+    }).catch(() => {})
   }, [error])
 
   return (

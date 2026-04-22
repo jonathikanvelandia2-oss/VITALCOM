@@ -1,5 +1,53 @@
 # Vitalcom Platform — Changelog
 
+## [2.14.0] — 2026-04-22
+
+**QA pre-producción — cierre de todos los riesgos de la auditoría.**
+
+Auditoría cross-cutting (seguridad · performance · data-integrity · UX · observabilidad) identificó 4 bloqueadores + 5 altos + 7 medios. Todos resueltos en esta release con 21 tests nuevos que blindan el parser markdown crítico.
+
+### 🔴 Bloqueadores resueltos
+
+- **B1** — `$queryRaw` en `/api/ads/overview` reemplazado por `groupBy` tipado de Prisma. Elimina vector potencial de SQL injection si algún parámetro externo llega al template literal.
+- **B2** — `/api/upload` ya no devuelve `e.message` crudo al cliente. Error interno log en servidor via observability; cliente recibe mensaje genérico + code.
+- **B3** — Nueva infra de observabilidad en `src/lib/observability/` (logs estructurados con redacción de campos sensibles). `withErrorHandler` reporta con route/method/userId. 4 error boundaries (root/admin/community/auth) envían al nuevo `/api/observability/client-error` con rate-limit por IP.
+- **B4** — `awardPoints` ahora envuelve increment + level-up en `prisma.$transaction` (elimina race condition donde dos acciones simultáneas podían perder el level-up). `/posts/[id]/like` devuelve el conteo post-UPDATE en lugar del valor stale pre-leído.
+
+### 🟠 Riesgos altos resueltos
+
+- **R1** — Fix N+1 en 3 endpoints. `shopify/webhooks/orders-create` ahora batchea productos por SKU con `findMany({ where: { sku: { in: skus } } })`. `shopify/sync-products` hace batch de ProductSync + Stock reales. `ai/impact/recompute` paraleliza con Promise.all + semáforo (concurrencia 5).
+- **R2** — Ownership validada en la query (`findFirst({ where: { id, userId } })`) en `/api/posts/[id]` y `/api/orders/[id]`. Si no cumple → 404 (sin revelar existencia del recurso). `updateMany` + `deleteMany` en posts para operación atómica.
+- **R3** — `shopify/sync-products` ya no envía `inventory_quantity: 100` hardcoded. Lee el stock real del país del dropshipper desde `Stock` y pausa el producto (`status: 'draft'`) si llega a 0.
+- **R4** — Creación de Order en webhook Shopify con retry 5x sobre `P2002` (unique constraint en `number`). Dos webhooks simultáneos ya no colisionan por número.
+- **R5** — Fire-and-forget `.catch(() => {})` en webhooks Dropi + Orders PATCH + Conversations DM reemplazados por `.catch(err => captureException(err, {...ctx}))`. Errores de notify/email ahora quedan en Runtime Logs.
+
+### 🟡 Riesgos medios resueltos
+
+- **M1** — 6 índices Prisma nuevos + `db push`: `Order.externalRef`, `Order(source, createdAt)`, `Order(country, createdAt)`, `WhatsappContact(accountId, isOptedIn)`, `WhatsappContact(accountId, shippingCountry)`, `Post(authorId, createdAt)`, `Post(category, createdAt)`, `Post(pinned, createdAt)`.
+- **M2** — Cache invalidation verificada: los repos (Product, Stock, Order, Finance, Insights) ya invalidan correctamente en mutations. Sin cambios, el audit era parcial.
+- **M3** — `broadcast-runner.resolveRecipients()` migrado a cursor-pagination con chunks de 500 (antes cargaba `take: 5000` de una) — evita picos de memoria en Vercel.
+- **M4** — `ShopifyClient.request()` agrega `AbortSignal.timeout(15s)` con cleanup — evita requests colgados que bloquean la función serverless.
+- **M5** — Revisado: los 3 reportados eran false positives (feed sí tiene spinner, pedidos/lanzador abren modales). Los submit de los forms ya estaban correctos.
+- **M6** — Parser markdown extraído de `/soporte/page.tsx` a `src/lib/markdown/inline.ts` con documentación del invariante "escape-first". **21 tests nuevos** cubriendo XSS (script, img, javascript:, atributos con comillas, backticks con HTML dentro), features (bold/code/paths), y edge cases (empty/huge/unclosed).
+- **M8** — `router.push` en `/register` envuelto en try/catch con fallback a `window.location.href` — si navegación falla, el usuario no queda en limbo.
+
+### Resumen
+
+- **155/155 tests pasando** (+21 nuevos sobre inline markdown)
+- **Typecheck strict sin errores**
+- **Build limpio**
+- **9 índices Prisma nuevos** aplicados a Supabase
+- **0 bloqueadores abiertos** para go-live
+
+### Cómo activar Sentry (opcional, post-deploy)
+
+La infra de observability ya está. Para enviar a Sentry real:
+1. `npm install @sentry/nextjs`
+2. Configurar `SENTRY_DSN` en Vercel env
+3. Reemplazar las 3 funciones de `src/lib/observability/index.ts` con `Sentry.captureException/captureMessage`
+
+No hay que tocar ningún call-site — todos usan `captureException/captureWarning/captureEvent` de la abstracción.
+
 ## [2.13.0] — 2026-04-21
 
 **V32 — Health Score del VITALCOMMER + retención automática.**

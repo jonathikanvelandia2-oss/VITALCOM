@@ -6,6 +6,12 @@ import { FinanceRepository } from '@/lib/repositories/finance-repository'
 import { prisma } from '@/lib/db/prisma'
 import { createNotification } from '@/lib/notifications/service'
 import { sendOrderStatusUpdateEmail } from '@/lib/email'
+import { captureException } from '@/lib/observability'
+
+const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'MANAGER_AREA', 'EMPLOYEE'] as const
+function isStaffRole(role: string): boolean {
+  return (STAFF_ROLES as readonly string[]).includes(role)
+}
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -13,16 +19,18 @@ type Ctx = { params: Promise<{ id: string }> }
 export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   const session = await requireSession()
   const { id } = await ctx!.params
+  const isStaff = isStaffRole(session.role)
 
-  const order = await OrderRepository.findById(id)
+  // Aplicamos ownership en la misma query — si no cumple, 404 (sin
+  // revelar existencia del recurso).
+  const order = await prisma.order.findFirst({
+    where: isStaff ? { id } : { id, userId: session.id },
+  })
   if (!order) throw new Error('NOT_FOUND')
 
-  const isStaff = ['SUPERADMIN', 'ADMIN', 'MANAGER_AREA', 'EMPLOYEE'].includes(session.role)
-  if (!isStaff && order.userId !== session.id) {
-    throw new Error('FORBIDDEN')
-  }
-
-  return apiSuccess(order)
+  // Devolvemos vía repository para mantener el mismo shape de datos
+  const detailed = await OrderRepository.findById(id)
+  return apiSuccess(detailed)
 })
 
 // ── PATCH /api/orders/[id] — Cambiar estado ─────────────
@@ -30,22 +38,22 @@ export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
 // Dueño del pedido: solo puede CANCELAR si está PENDING o CONFIRMED.
 export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   const session = await requireSession()
-  const isStaff = ['SUPERADMIN', 'ADMIN', 'MANAGER_AREA', 'EMPLOYEE'].includes(session.role)
+  const isStaff = isStaffRole(session.role)
 
   const { id } = await ctx!.params
 
-  const order = await prisma.order.findUnique({ where: { id } })
+  // Filtrado atómico de ownership — si no cumple, 404.
+  const order = await prisma.order.findFirst({
+    where: isStaff ? { id } : { id, userId: session.id },
+  })
   if (!order) throw new Error('NOT_FOUND')
-
-  // Validar permisos: staff o dueño-cancelando-early
-  const isOwner = order.userId === session.id
-  if (!isStaff && !isOwner) throw new Error('FORBIDDEN')
 
   const body = await req.json()
   const data = updateOrderStatusSchema.parse(body)
 
   // Dueño solo puede cancelar pedidos early-stage
-  if (!isStaff) {
+  const isOwner = order.userId === session.id
+  if (!isStaff && isOwner) {
     const cancellable = ['PENDING', 'CONFIRMED']
     if (data.status !== 'CANCELLED' || !cancellable.includes(order.status)) {
       return apiError(
@@ -104,7 +112,13 @@ export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
       body: updated.trackingCode ? `Guía: ${updated.trackingCode}` : undefined,
       link: `/pedidos`,
       meta: { orderId: id, orderNumber: updated.number, status: data.status },
-    }).catch(() => {})
+    }).catch(err =>
+      captureException(err, {
+        route: '/api/orders/[id]',
+        tags: { stage: 'notify' },
+        extra: { orderId: id, recipientId: order.userId },
+      }),
+    )
 
     if (order.customerEmail) {
       sendOrderStatusUpdateEmail(order.customerEmail, {
@@ -115,7 +129,13 @@ export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
         carrier: updated.carrier,
         total: updated.total,
         country: updated.country,
-      }).catch(() => {})
+      }).catch(err =>
+        captureException(err, {
+          route: '/api/orders/[id]',
+          tags: { stage: 'email' },
+          extra: { orderId: id, orderNumber: updated.number },
+        }),
+      )
     }
   }
 

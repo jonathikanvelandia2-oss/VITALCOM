@@ -63,29 +63,32 @@ export function getLevelProgress(points: number) {
   }
 }
 
-/** Otorga puntos a un usuario y actualiza su nivel */
+/** Otorga puntos a un usuario y actualiza su nivel de forma atómica.
+ *  La transacción evita race conditions si dos acciones llegan
+ *  simultáneamente (ej: like + comment en el mismo milisegundo).
+ */
 export async function awardPoints(userId: string, action: PointAction) {
   const amount = POINTS[action]
 
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      points: { increment: amount },
-    },
-    select: { points: true, level: true },
-  })
-
-  // Verificar si subió de nivel
-  const newLevel = getLevelFromPoints(user.points)
-  if (newLevel.level !== user.level) {
-    await prisma.user.update({
+  return prisma.$transaction(async tx => {
+    const user = await tx.user.update({
       where: { id: userId },
-      data: { level: newLevel.level },
+      data: { points: { increment: amount } },
+      select: { points: true, level: true },
     })
-    return { points: user.points, levelUp: true, newLevel }
-  }
 
-  return { points: user.points, levelUp: false, newLevel }
+    const newLevel = getLevelFromPoints(user.points)
+    const levelUp = newLevel.level !== user.level
+
+    if (levelUp) {
+      await tx.user.update({
+        where: { id: userId },
+        data: { level: newLevel.level },
+      })
+    }
+
+    return { points: user.points, levelUp, newLevel }
+  })
 }
 
 /** Formatea el nombre del nivel con emoji */

@@ -9,6 +9,7 @@ import { FinanceRepository } from '@/lib/repositories/finance-repository'
 import { VALID_TRANSITIONS } from '@/lib/api/schemas/order'
 import { createNotification } from '@/lib/notifications/service'
 import { sendOrderStatusUpdateEmail } from '@/lib/email'
+import { captureException, captureWarning } from '@/lib/observability'
 
 // ── POST /api/dropi/webhooks/tracking ──────────────────
 // Dropi notifica cambios de estado de envíos. Payload típico:
@@ -35,7 +36,9 @@ export async function POST(req: Request) {
   const rawBody = await req.text()
 
   if (!verifyDropiWebhook(rawBody, signature)) {
-    console.warn('[dropi/webhook] firma inválida o secreto no configurado')
+    captureWarning('[dropi/webhook] firma inválida o secreto no configurado', {
+      route: '/api/dropi/webhooks/tracking',
+    })
     return new NextResponse('Invalid signature', { status: 401 })
   }
 
@@ -57,7 +60,9 @@ export async function POST(req: Request) {
   const trackingCode = payload.tracking_code
 
   if (!externalId && !trackingCode) {
-    console.warn('[dropi/webhook] payload sin external_id ni tracking_code')
+    captureWarning('[dropi/webhook] payload sin external_id ni tracking_code', {
+      route: '/api/dropi/webhooks/tracking',
+    })
     return NextResponse.json({ received: true, ignored: 'no_identifier' })
   }
 
@@ -69,7 +74,10 @@ export async function POST(req: Request) {
       : null
 
   if (!order) {
-    console.warn('[dropi/webhook] orden no encontrada', { externalId, trackingCode })
+    captureWarning('[dropi/webhook] orden no encontrada', {
+      route: '/api/dropi/webhooks/tracking',
+      extra: { externalId, trackingCode },
+    })
     // Responder 200 para que Dropi no reintente infinito — la orden ya no existe.
     return NextResponse.json({ received: true, ignored: 'order_not_found' })
   }
@@ -128,9 +136,10 @@ export async function POST(req: Request) {
       await FinanceRepository.recordOrderCancellation(order.id)
     }
   } catch (err) {
-    console.error('[dropi/webhook] fallo al registrar finanza', {
-      order: order.number,
-      err: err instanceof Error ? err.message : err,
+    captureException(err, {
+      route: '/api/dropi/webhooks/tracking',
+      tags: { stage: 'finance' },
+      extra: { orderId: order.id, orderNumber: order.number, newStatus },
     })
     // No fallamos el webhook — el estado ya quedó guardado.
   }
@@ -151,7 +160,13 @@ export async function POST(req: Request) {
       body: trackingCode ? `Guía: ${trackingCode}` : undefined,
       link: '/pedidos',
       meta: { orderId: order.id, orderNumber: order.number, status: newStatus, source: 'dropi' },
-    }).catch(() => {})
+    }).catch(err =>
+      captureException(err, {
+        route: '/api/dropi/webhooks/tracking',
+        tags: { stage: 'notify' },
+        extra: { orderId: order.id, recipientId: order.userId },
+      }),
+    )
   }
 
   if (order.customerEmail && ['DISPATCHED', 'DELIVERED', 'CANCELLED', 'RETURNED'].includes(newStatus)) {
@@ -163,7 +178,13 @@ export async function POST(req: Request) {
       carrier: payload.carrier ?? order.carrier,
       total: order.total,
       country: order.country,
-    }).catch(() => {})
+    }).catch(err =>
+      captureException(err, {
+        route: '/api/dropi/webhooks/tracking',
+        tags: { stage: 'email' },
+        extra: { orderId: order.id, orderNumber: order.number },
+      }),
+    )
   }
 
   return NextResponse.json({ received: true, from: order.status, to: newStatus })

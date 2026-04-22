@@ -18,25 +18,33 @@ export const POST = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     where: { postId_userId: { postId, userId: session.id } },
   })
 
+  // Devolvemos el valor `likes` leído del UPDATE (con RETURNING) para
+  // evitar reportar un conteo stale si otro like llegó en paralelo.
   if (existing) {
-    // Quitar like
-    await prisma.$transaction([
+    const [, updated] = await prisma.$transaction([
       prisma.postLike.delete({ where: { id: existing.id } }),
-      prisma.post.update({ where: { id: postId }, data: { likes: { decrement: 1 } } }),
+      prisma.post.update({
+        where: { id: postId },
+        data: { likes: { decrement: 1 } },
+        select: { likes: true },
+      }),
     ])
-    return apiSuccess({ liked: false, likes: post.likes - 1 })
+    return apiSuccess({ liked: false, likes: updated.likes })
   } else {
-    // Dar like
-    await prisma.$transaction([
+    const [, updated] = await prisma.$transaction([
       prisma.postLike.create({ data: { postId, userId: session.id } }),
-      prisma.post.update({ where: { id: postId }, data: { likes: { increment: 1 } } }),
+      prisma.post.update({
+        where: { id: postId },
+        data: { likes: { increment: 1 } },
+        select: { likes: true },
+      }),
     ])
 
-    // Puntos al autor del post (no a quien da like)
+    // Puntos al autor (fuera de transacción porque es best-effort)
     if (post.authorId !== session.id) {
       await awardPoints(post.authorId, 'LIKE_RECEIVED')
     }
 
-    return apiSuccess({ liked: true, likes: post.likes + 1 })
+    return apiSuccess({ liked: true, likes: updated.likes })
   }
 })

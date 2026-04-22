@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireRole } from '@/lib/auth/session'
+import { captureException } from '@/lib/observability'
 
 export const runtime = 'nodejs'
 
@@ -55,7 +56,11 @@ export async function POST(req: Request) {
       })
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      captureException(error, { route: '/api/upload', tags: { stage: 'supabase-upload' } })
+      return NextResponse.json(
+        { ok: false, error: 'No se pudo subir el archivo', code: 'UPLOAD_FAILED' },
+        { status: 500 },
+      )
     }
 
     const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`
@@ -64,8 +69,18 @@ export async function POST(req: Request) {
       ok: true,
       data: { url: publicUrl, path, bucket, size: file.size, type: file.type },
     }, { status: 201 })
-  } catch (e: any) {
-    const status = e.message === 'UNAUTHORIZED' ? 401 : e.message === 'FORBIDDEN' ? 403 : 500
-    return NextResponse.json({ ok: false, error: e.message || 'Error interno' }, { status })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : ''
+    if (msg === 'UNAUTHORIZED') {
+      return NextResponse.json({ ok: false, error: 'No autenticado', code: 'UNAUTHORIZED' }, { status: 401 })
+    }
+    if (msg === 'FORBIDDEN') {
+      return NextResponse.json({ ok: false, error: 'Sin permisos', code: 'FORBIDDEN' }, { status: 403 })
+    }
+    captureException(e, { route: '/api/upload', tags: { stage: 'handler' } })
+    return NextResponse.json(
+      { ok: false, error: 'Error interno del servidor', code: 'INTERNAL_ERROR' },
+      { status: 500 },
+    )
   }
 }

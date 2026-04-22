@@ -36,18 +36,18 @@ export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   })
 })
 
+// Filtro de ownership que aplicamos en la query para que
+// no-owners reciban 404 (sin revelar existencia del recurso).
+function ownsPostWhere(id: string, session: { id: string; role: string }) {
+  return isStaff(session.role)
+    ? { id }
+    : { id, authorId: session.id }
+}
+
 // ── PUT /api/posts/[id] — Editar post ──────────────────
 export const PUT = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   const session = await requireSession()
   const { id } = await ctx!.params
-
-  const post = await prisma.post.findUnique({ where: { id } })
-  if (!post) throw new Error('NOT_FOUND')
-
-  // Solo el autor o staff pueden editar
-  if (post.authorId !== session.id && !isStaff(session.role)) {
-    throw new Error('FORBIDDEN')
-  }
 
   const body = await req.json()
   const data = updatePostSchema.parse(body)
@@ -57,15 +57,21 @@ export const PUT = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     delete (data as any).pinned
   }
 
-  const updated = await prisma.post.update({
-    where: { id },
+  // updateMany con filtro de ownership en la query → atómico.
+  // Si no matchea (no existe o no es dueño), count=0 y devolvemos 404.
+  const result = await prisma.post.updateMany({
+    where: ownsPostWhere(id, session),
     data,
+  })
+  if (result.count === 0) throw new Error('NOT_FOUND')
+
+  const updated = await prisma.post.findUnique({
+    where: { id },
     include: {
       author: { select: { id: true, name: true, level: true, points: true, avatar: true } },
       _count: { select: { comments: true } },
     },
   })
-
   return apiSuccess(updated)
 })
 
@@ -74,15 +80,10 @@ export const DELETE = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   const session = await requireSession()
   const { id } = await ctx!.params
 
-  const post = await prisma.post.findUnique({ where: { id } })
-  if (!post) throw new Error('NOT_FOUND')
-
-  // Solo el autor o staff pueden eliminar
-  if (post.authorId !== session.id && !isStaff(session.role)) {
-    throw new Error('FORBIDDEN')
-  }
-
-  await prisma.post.delete({ where: { id } })
+  const result = await prisma.post.deleteMany({
+    where: ownsPostWhere(id, session),
+  })
+  if (result.count === 0) throw new Error('NOT_FOUND')
 
   return apiSuccess({ deleted: true })
 })
