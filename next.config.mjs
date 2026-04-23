@@ -16,6 +16,13 @@ const nextConfig = {
     serverActions: { bodySizeLimit: '5mb' },
   },
 
+  // URL amigable para la presentación ejecutiva self-contained
+  async rewrites() {
+    return [
+      { source: '/presentacion', destination: '/presentacion.html' },
+    ]
+  },
+
   // ── Headers de seguridad — SOLO en producción ─────────
   async headers() {
     if (!isProd) return []
