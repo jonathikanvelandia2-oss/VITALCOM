@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { Package, ShoppingCart, Search, Loader2 } from 'lucide-react'
+import Link from 'next/link'
+import { Package, Eye, Search, Loader2 } from 'lucide-react'
 import { CommunityTopbar } from '@/components/community/CommunityTopbar'
 import { useProducts } from '@/hooks/useProducts'
 
@@ -171,9 +172,12 @@ export default function CatalogoComunidadPage() {
                         $ {ganancia.toLocaleString('es-CO')} ({margin}%)
                       </span>
                     </div>
-                    <button className="vc-btn-primary flex w-full items-center justify-center gap-2 text-xs">
-                      <ShoppingCart size={14} /> Agregar a mi tienda
-                    </button>
+                    <Link
+                      href={`/producto/${p.id}`}
+                      className="vc-btn-primary flex w-full items-center justify-center gap-2 text-xs"
+                    >
+                      <Eye size={14} /> Consultar producto
+                    </Link>
                   </div>
                 </article>
               )
