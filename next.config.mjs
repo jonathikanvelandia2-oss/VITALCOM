@@ -14,6 +14,11 @@ const nextConfig = {
 
   experimental: {
     serverActions: { bodySizeLimit: '5mb' },
+    // Fuerza que Vercel incluya el HTML de la presentación en el bundle
+    // serverless de la función /presentacion (readFileSync puede leerlo).
+    outputFileTracingIncludes: {
+      '/presentacion': ['./public/presentacion.html'],
+    },
   },
 
 
