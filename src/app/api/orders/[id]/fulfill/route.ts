@@ -4,6 +4,8 @@ import { apiSuccess, apiError, withErrorHandler } from '@/lib/api/response'
 import { requireSession } from '@/lib/auth/session'
 import { createShipment, isDropiConfigured, type OrderForDropi } from '@/lib/integrations/dropi'
 import { rateLimit, rateLimitHeaders } from '@/lib/security/rate-limit'
+import { writeFulfillmentLog } from '@/lib/fulfillment/service'
+import { captureException } from '@/lib/observability'
 
 // ── POST /api/orders/[id]/fulfill ──────────────────────
 // Dispara el envío a Dropi. Solo staff (logística + superiores).
@@ -103,7 +105,7 @@ export const POST = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     )
   }
 
-  // Persistir tracking + estado DISPATCHED en una sola transacción.
+  // Persistir tracking + estado DISPATCHED + metadata Dropi + log atómico.
   const updated = await prisma.order.update({
     where: { id },
     data: {
@@ -111,6 +113,10 @@ export const POST = withErrorHandler(async (req: Request, ctx?: Ctx) => {
       trackingCode: shipment.tracking_code,
       carrier: shipment.carrier || 'Dropi',
       externalRef: order.externalRef ?? String(shipment.id),
+      fulfillmentMode: 'DROPI',
+      fulfilledById: session.id,
+      fulfilledAt: new Date(),
+      labelUrl: shipment.label_url ?? null,
       notes: [
         order.notes,
         `[Dropi] Envío creado #${shipment.id} — ${shipment.tracking_code}`,
@@ -122,6 +128,29 @@ export const POST = withErrorHandler(async (req: Request, ctx?: Ctx) => {
       items: { include: { product: { select: { id: true, sku: true, name: true } } } },
     },
   })
+
+  // V37 — Audit trail: DROPI_DISPATCHED con metadata del envío externo
+  writeFulfillmentLog(prisma, {
+    orderId: id,
+    actorId: session.id,
+    action: 'DROPI_DISPATCHED',
+    fromStatus: 'PROCESSING',
+    toStatus: 'DISPATCHED',
+    message: `Envío Dropi #${shipment.id}`,
+    metadata: {
+      dropiShipmentId: shipment.id,
+      trackingCode: shipment.tracking_code,
+      carrier: shipment.carrier || 'Dropi',
+      labelUrl: shipment.label_url ?? null,
+      estimatedDelivery: shipment.estimated_delivery ?? null,
+    },
+  }).catch((err) =>
+    captureException(err, {
+      route: '/api/orders/[id]/fulfill',
+      tags: { stage: 'audit-log' },
+      extra: { orderId: id },
+    }),
+  )
 
   return apiSuccess({
     order: updated,

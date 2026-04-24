@@ -12,7 +12,7 @@ export async function GET() {
     deployedAt: process.env.VERCEL_GIT_COMMIT_AUTHOR_LOGIN
       ? new Date().toISOString()
       : 'local-dev',
-    version: '2.22.0-manual-fulfillment',
+    version: '2.23.0-whatsapp-channels',
     routes: {
       presentation: '/presentacion',
       presentationStatic: '/presentacion.html',

@@ -77,6 +77,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/cursos', label: 'Cursos', icon: GraduationCap },
       { href: '/ranking', label: 'Ranking', icon: Trophy },
       { href: '/chat', label: 'Chat', icon: MessageSquare },
+      { href: '/canales', label: 'Canales WhatsApp', icon: MessageSquare, badge: 'NEW' },
       { href: '/eventos', label: 'Eventos', icon: Calendar },
       { href: '/reuniones', label: 'Reuniones', icon: Video },
     ],

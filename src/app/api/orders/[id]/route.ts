@@ -7,6 +7,8 @@ import { prisma } from '@/lib/db/prisma'
 import { createNotification } from '@/lib/notifications/service'
 import { sendOrderStatusUpdateEmail } from '@/lib/email'
 import { captureException } from '@/lib/observability'
+import { writeFulfillmentLog } from '@/lib/fulfillment/service'
+import type { FulfillmentAction } from '@prisma/client'
 
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'MANAGER_AREA', 'EMPLOYEE'] as const
 function isStaffRole(role: string): boolean {
@@ -85,6 +87,37 @@ export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
       items: { include: { product: { select: { id: true, sku: true, name: true } } } },
     },
   })
+
+  // V37 — Audit trail: cada transición deja registro con actor + metadata.
+  // Fire-and-forget: no bloqueamos al cliente si falla el log.
+  const actionByStatus: Record<string, FulfillmentAction> = {
+    PENDING: 'STATUS_CHANGED',
+    CONFIRMED: 'STATUS_CHANGED',
+    PROCESSING: 'STATUS_CHANGED',
+    DISPATCHED: 'TRACKING_ASSIGNED',
+    DELIVERED: 'DELIVERED_CONFIRMED',
+    CANCELLED: 'CANCELLED',
+    RETURNED: 'RETURNED',
+  }
+  writeFulfillmentLog(prisma, {
+    orderId: id,
+    actorId: session.id,
+    action: actionByStatus[data.status] ?? 'STATUS_CHANGED',
+    fromStatus: order.status,
+    toStatus: data.status,
+    message: data.notes ?? null,
+    metadata: {
+      ...(data.trackingCode ? { trackingCode: data.trackingCode } : {}),
+      ...(data.carrier ? { carrier: data.carrier } : {}),
+      actor: session.role,
+    },
+  }).catch((err) =>
+    captureException(err, {
+      route: '/api/orders/[id]',
+      tags: { stage: 'audit-log' },
+      extra: { orderId: id, toStatus: data.status },
+    }),
+  )
 
   // Efectos financieros según el nuevo estado
   if (data.status === 'DELIVERED') {

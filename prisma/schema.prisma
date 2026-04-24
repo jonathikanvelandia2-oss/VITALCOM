@@ -148,6 +148,7 @@ model User {
   orders                  Order[]
   fulfilledOrders         Order[]                  @relation("OrderFulfiller")
   fulfillmentLogs         FulfillmentLog[]         @relation("FulfillmentActor")
+  channelClicks           ChannelClick[]
   pricingCalcs            PricingCalculation[]
   workflows               WorkflowTemplate[]
   courseProgress          CourseProgress[]
@@ -2396,4 +2397,58 @@ model WeeklyInsight {
   @@unique([userId, weekStart])
   @@index([userId, weekStart(sort: Desc)])
   @@index([weekStart])
+}
+
+// ─────────────────────────────────────────────────────────
+// V38 — CANALES VITALCOM (WhatsApp phonebook)
+// ─────────────────────────────────────────────────────────
+// Los canales oficiales de comunicación entre Vitalcom y su comunidad:
+// números 1-a-1 por área, invites a grupos, canales de anuncios. Se
+// sirven como deep links (wa.me) sin depender de Meta WABA — útil HOY
+// mientras se aprueba la Business API.
+
+enum ChannelType {
+  STAFF_DM // 1-a-1 con un staff de un área (wa.me link con mensaje pre-llenado)
+  COMMUNITY_GROUP // invite link a grupo de WhatsApp de la comunidad
+  BROADCAST_LIST // lista de difusión (el user escribe para suscribirse)
+  ANNOUNCEMENTS // WhatsApp Channels (read-only desde WA)
+}
+
+model VitalcomChannel {
+  id             String      @id @default(cuid())
+  type           ChannelType
+  area           Area?
+  label          String
+  description    String?
+  phone          String? // E.164 sin "+" (ej: 573001234567)
+  inviteUrl      String? // para COMMUNITY_GROUP / ANNOUNCEMENTS
+  defaultMessage String? // texto pre-llenado en wa.me?text=
+  icon           String? // emoji o nombre lucide para el card
+  country        Country?
+  active         Boolean     @default(true)
+  order          Int         @default(0)
+
+  clicks ChannelClick[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type, active])
+  @@index([area, active])
+  @@index([country, active])
+}
+
+model ChannelClick {
+  id        String          @id @default(cuid())
+  channelId String
+  channel   VitalcomChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?           @relation(fields: [userId], references: [id])
+  userAgent String?
+  referrer  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([channelId, createdAt])
+  @@index([userId, createdAt])
 }
