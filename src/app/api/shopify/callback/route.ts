@@ -6,6 +6,8 @@ import { exchangeCodeForToken } from '@/lib/integrations/shopify/oauth'
 import { verifyOAuthHmac, normalizeShopDomain } from '@/lib/integrations/shopify/hmac'
 import { encryptToken } from '@/lib/integrations/shopify/crypto'
 import { ShopifyClient } from '@/lib/integrations/shopify/client'
+import { captureException } from '@/lib/observability'
+import { writeAuditLog, extractRequestMeta } from '@/lib/audit/logger'
 
 // ── GET /api/shopify/callback ──────────────────────────
 // Shopify redirige aquí después de que el merchant acepta los permisos.
@@ -20,6 +22,17 @@ import { ShopifyClient } from '@/lib/integrations/shopify/client'
 
 const STATE_COOKIE = 'shopify_oauth_state'
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://vitalcom.vercel.app').replace(/\/$/, '')
+
+// Topics a suscribir automáticamente al instalarse la app.
+// `app/uninstalled` es el más crítico: cuando el merchant desinstala,
+// Shopify avisa para que limpiemos su token y marquemos la tienda inactiva.
+const AUTO_WEBHOOKS: Array<{ topic: string; path: string }> = [
+  { topic: 'orders/create', path: '/api/shopify/webhooks' },
+  { topic: 'orders/paid', path: '/api/shopify/webhooks' },
+  { topic: 'orders/fulfilled', path: '/api/shopify/webhooks' },
+  { topic: 'orders/cancelled', path: '/api/shopify/webhooks' },
+  { topic: 'app/uninstalled', path: '/api/shopify/webhooks' },
+]
 
 export const GET = withErrorHandler(async (req: Request) => {
   const url = new URL(req.url)
@@ -100,6 +113,49 @@ export const GET = withErrorHandler(async (req: Request) => {
       connectedAt: now,
       lastSyncAt: now,
     },
+  })
+
+  // 6. Registrar webhooks fire-and-forget. Si Shopify ya tenía alguno, devuelve
+  //    409 duplicate y lo ignoramos. No bloqueamos el flujo si falla — la UI
+  //    permitirá re-sincronizar después.
+  const client = new ShopifyClient(shop, tokenResponse.access_token)
+  const webhookResults = await Promise.allSettled(
+    AUTO_WEBHOOKS.map((w) => client.registerWebhook(w.topic, `${APP_URL}${w.path}`)),
+  )
+  const webhookFailures = webhookResults
+    .map((r, i) => ({ topic: AUTO_WEBHOOKS[i].topic, result: r }))
+    .filter((x) => x.result.status === 'rejected')
+
+  if (webhookFailures.length > 0) {
+    captureException(new Error('SHOPIFY_WEBHOOK_REGISTRATION_PARTIAL'), {
+      route: '/api/shopify/callback',
+      tags: { stage: 'webhook-register' },
+      extra: {
+        shop,
+        failures: webhookFailures.map((f) => ({
+          topic: f.topic,
+          reason: (f.result as PromiseRejectedResult).reason?.message ?? 'unknown',
+        })),
+      },
+    })
+  }
+
+  // 7. Audit log — registro de instalación exitosa
+  const meta = extractRequestMeta(req)
+  writeAuditLog({
+    resource: 'ADMIN_CONFIG',
+    action: 'OTHER',
+    summary: `Tienda Shopify conectada: ${shop}`,
+    actor: { id: storedUserId, email: null, role: null },
+    metadata: {
+      shop,
+      storeName: shopInfo?.name ?? null,
+      plan: shopInfo?.plan_display_name ?? null,
+      webhooksRegistered: AUTO_WEBHOOKS.length - webhookFailures.length,
+      webhooksFailed: webhookFailures.length,
+    },
+    ip: meta.ip,
+    userAgent: meta.userAgent,
   })
 
   return NextResponse.redirect(`${APP_URL}/mi-tienda?connected=1&shop=${encodeURIComponent(shop)}`)

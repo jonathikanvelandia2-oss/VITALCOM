@@ -67,6 +67,22 @@ function checkBuildInfo(): CheckResult {
   }
 }
 
+// ── Checks de integraciones externas ──
+// Informativos (no bloquean criticalOk). Cada uno dice "configured" si las
+// vars mínimas están; "missing" con detalle si falta algo.
+
+function checkIntegration(name: string, required: string[]): CheckResult {
+  const missing = required.filter((v) => !process.env[v])
+  return {
+    name,
+    ok: missing.length === 0,
+    detail:
+      missing.length === 0
+        ? 'configured'
+        : `missing: ${missing.join(', ')}`,
+  }
+}
+
 export async function GET() {
   const [db, envs, build] = await Promise.all([
     checkDatabase(),
@@ -74,8 +90,19 @@ export async function GET() {
     Promise.resolve(checkBuildInfo()),
   ])
 
-  const checks = [db, envs, build]
-  // "ok global" = db + envs pasan (build solo informativo)
+  // Checks informativos de integraciones (no bloquean criticalOk)
+  const shopify = checkIntegration('shopify', [
+    'SHOPIFY_CLIENT_ID',
+    'SHOPIFY_CLIENT_SECRET',
+    'VITALCOM_ENCRYPTION_KEY',
+  ])
+  const openai = checkIntegration('openai', ['OPENAI_API_KEY'])
+  const resend = checkIntegration('resend', ['RESEND_API_KEY'])
+  const dropi = checkIntegration('dropi', ['DROPI_API_KEY'])
+
+  const integrations = [shopify, openai, resend, dropi]
+  const checks = [db, envs, build, ...integrations]
+  // "ok global" = db + envs pasan (build + integraciones solo informativo)
   const criticalOk = db.ok && envs.ok
   const degraded = checks.filter(c => !c.ok).map(c => c.name)
 

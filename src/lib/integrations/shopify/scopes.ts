@@ -1,6 +1,8 @@
 // ── Shopify scopes y versión de API ────────────────────
 
-export const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2025-01'
+// 2026-04 es la versión activa en el dashboard de Vitalcom platform.
+// Shopify soporta versiones por 12 meses — revisar anualmente.
+export const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2026-04'
 
 // Permisos mínimos que Vitalcom necesita para operar una tienda dropshipper:
 // - read/write_products: crear y actualizar productos Vitalcom en la tienda
