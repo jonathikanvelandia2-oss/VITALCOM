@@ -8,6 +8,7 @@ import {
   FileText, Calculator, Crown, BarChart3, Target, Zap,
   MessageSquare, Receipt, UserCheck, FolderOpen, Building2,
   Bot, Gauge, Brain, ShieldAlert, Workflow as WorkflowIcon, Phone, Activity,
+  ShieldCheck,
 } from 'lucide-react'
 import { Logo } from '@/components/shared/Logo'
 import { useInboxUnread } from '@/hooks/useInbox'
@@ -40,6 +41,7 @@ const NAV_SECTIONS: NavSection[] = [
       { href: '/admin/whatsapp/broadcasts', label: 'Broadcasts WA', icon: Megaphone, badge: 'NEW' },
       { href: '/admin/inbox', label: 'Inbox interno', icon: Inbox },
       { href: '/admin/ops', label: 'Salud sistema', icon: Activity, badge: 'NEW' },
+      { href: '/admin/seguridad', label: 'Seguridad · Audit', icon: ShieldCheck, badge: 'NEW' },
       { href: '/admin/cache-stats', label: 'Cache stats', icon: Gauge },
       { href: '/admin/ajustes', label: 'Ajustes', icon: Settings },
     ],

@@ -8,6 +8,7 @@ import { createNotification } from '@/lib/notifications/service'
 import { sendOrderStatusUpdateEmail } from '@/lib/email'
 import { captureException } from '@/lib/observability'
 import { writeFulfillmentLog } from '@/lib/fulfillment/service'
+import { writeAuditLog, extractRequestMeta } from '@/lib/audit/logger'
 import type { FulfillmentAction } from '@prisma/client'
 
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'MANAGER_AREA', 'EMPLOYEE'] as const
@@ -118,6 +119,28 @@ export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
       extra: { orderId: id, toStatus: data.status },
     }),
   )
+
+  // V40 — Audit log global: escribir también en la bitácora de seguridad
+  // general (complementaria a FulfillmentLog que es específica de pedidos).
+  const meta = extractRequestMeta(req)
+  const isCancellation = data.status === 'CANCELLED'
+  writeAuditLog({
+    resource: 'ORDER',
+    action: isCancellation ? 'ORDER_CANCELLED' : 'ORDER_STATUS_CHANGED',
+    resourceId: id,
+    summary: `${session.email} cambió pedido ${updated.number}: ${order.status} → ${data.status}`,
+    actor: { id: session.id, email: session.email, role: session.role },
+    metadata: {
+      orderNumber: updated.number,
+      fromStatus: order.status,
+      toStatus: data.status,
+      trackingCode: data.trackingCode ?? null,
+      carrier: data.carrier ?? null,
+      cancelledByOwner: !isStaff && isOwner,
+    },
+    ip: meta.ip,
+    userAgent: meta.userAgent,
+  })
 
   // Efectos financieros según el nuevo estado
   if (data.status === 'DELIVERED') {

@@ -12,7 +12,7 @@ export async function GET() {
     deployedAt: process.env.VERCEL_GIT_COMMIT_AUTHOR_LOGIN
       ? new Date().toISOString()
       : 'local-dev',
-    version: '2.24.0-staff-inbox-operational',
+    version: '2.25.0-audit-log-global',
     routes: {
       presentation: '/presentacion',
       presentationStatic: '/presentacion.html',

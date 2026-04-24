@@ -4,6 +4,7 @@ import { registerSchema } from '@/lib/auth/schemas'
 import { hashPassword } from '@/lib/security/password'
 import { rateLimit, RATE_LIMITS, rateLimitHeaders } from '@/lib/security/rate-limit'
 import { sendWelcomeEmail } from '@/lib/email'
+import { writeAuditLog, extractRequestMeta } from '@/lib/audit/logger'
 import { ZodError } from 'zod'
 
 // ── POST /api/auth/register ─────────────────────────────
@@ -64,6 +65,18 @@ export async function POST(req: Request) {
     // el registro ya fue exitoso y el error queda en logs para operaciones.
     sendWelcomeEmail(user.email, { name: user.name || 'Vitalcommer' }).catch((err) => {
       console.error('[register] welcome email failed', err)
+    })
+
+    const meta = extractRequestMeta(req)
+    writeAuditLog({
+      resource: 'AUTH',
+      action: 'REGISTER',
+      resourceId: user.id,
+      summary: `Nuevo registro: ${user.email}`,
+      actor: { id: user.id, email: user.email, role: user.role },
+      metadata: { role: user.role },
+      ip: meta.ip,
+      userAgent: meta.userAgent,
     })
 
     return NextResponse.json(

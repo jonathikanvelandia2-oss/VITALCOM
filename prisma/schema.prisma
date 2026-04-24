@@ -187,6 +187,8 @@ model User {
   productLandings         ProductLanding[]
   // V34 — Weekly Insights proactivos
   weeklyInsights          WeeklyInsight[]
+  // V40 — Audit log global
+  auditLogs               AuditLog[]               @relation("AuditActor")
 }
 
 // ─────────────────────────────────────────────────────────
@@ -2466,4 +2468,92 @@ model ChannelClick {
 
   @@index([channelId, createdAt])
   @@index([userId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────
+// V40 — AUDIT LOG GLOBAL
+// Registro genérico para operaciones sensibles. Complementa FulfillmentLog
+// (que sigue específico para pedidos). Sirve como evidencia para integraciones
+// externas (Dropi/Effi) y compliance legal multipaís.
+// ─────────────────────────────────────────────────────────
+
+enum AuditResource {
+  AUTH
+  USER
+  ROLE
+  ORDER
+  PRODUCT
+  STOCK
+  INBOX
+  CHANNEL
+  FINANCE
+  EXPORT
+  ADMIN_CONFIG
+  API_KEY
+  OTHER
+}
+
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  REGISTER
+  PASSWORD_RESET_REQUESTED
+  PASSWORD_RESET_COMPLETED
+  ROLE_CHANGED
+  AREA_CHANGED
+  USER_CREATED
+  USER_DEACTIVATED
+  USER_REACTIVATED
+  USER_DELETED
+  PRODUCT_CREATED
+  PRODUCT_UPDATED
+  PRODUCT_DEACTIVATED
+  STOCK_ADJUSTED
+  ORDER_CREATED
+  ORDER_STATUS_CHANGED
+  ORDER_CANCELLED
+  INBOX_THREAD_RESOLVED
+  INBOX_THREAD_REASSIGNED
+  CHANNEL_CREATED
+  CHANNEL_UPDATED
+  CHANNEL_DISABLED
+  EXPORT_REQUESTED
+  DATA_ACCESSED
+  CONFIG_UPDATED
+  API_KEY_CREATED
+  API_KEY_REVOKED
+  OTHER
+}
+
+enum AuditSeverity {
+  INFO
+  NOTICE
+  WARNING
+  CRITICAL
+}
+
+model AuditLog {
+  id         String         @id @default(cuid())
+  actorId    String? // null = sistema / anónimo (ej: login fallido)
+  actor      User?          @relation("AuditActor", fields: [actorId], references: [id])
+  actorEmail String? // snapshot por si user fue borrado
+  actorRole  String? // snapshot role al momento
+  resource   AuditResource
+  resourceId String? // id del recurso afectado (orderId, userId, etc.)
+  action     AuditAction
+  severity   AuditSeverity  @default(INFO)
+  summary    String // texto humano legible
+  metadata   Json? // payload contextual (ip, fromValue/toValue, etc.)
+  ip         String?
+  userAgent  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([resource, createdAt])
+  @@index([action, createdAt])
+  @@index([severity, createdAt])
+  @@index([resourceId])
+  @@index([createdAt])
 }

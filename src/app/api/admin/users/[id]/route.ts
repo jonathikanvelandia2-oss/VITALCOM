@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db/prisma'
 import { apiSuccess, withErrorHandler } from '@/lib/api/response'
 import { requireRole } from '@/lib/auth/session'
 import { updateUserSchema } from '@/lib/api/schemas/user'
+import { writeAuditLog, extractRequestMeta, diffFields } from '@/lib/audit/logger'
 
 type Ctx = { params: Promise<{ id: string }> }
 
@@ -153,7 +154,7 @@ export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
 
 // ── PATCH /api/admin/users/[id] — Actualizar usuario ───
 export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
-  await requireRole('ADMIN')
+  const session = await requireRole('ADMIN')
   const { id } = await ctx!.params
 
   const user = await prisma.user.findUnique({ where: { id } })
@@ -177,12 +178,62 @@ export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     },
   })
 
+  const meta = extractRequestMeta(req)
+  const actorSnapshot = { id: session.id, email: session.email, role: session.role }
+
+  const changes = diffFields(
+    user as unknown as Record<string, unknown>,
+    updated as unknown as Record<string, unknown>,
+    ['role', 'area', 'country', 'active', 'verified'],
+  )
+
+  if (changes.role) {
+    writeAuditLog({
+      resource: 'ROLE',
+      action: 'ROLE_CHANGED',
+      resourceId: id,
+      summary: `${session.email} cambió el rol de ${user.email} (${changes.role.from} → ${changes.role.to})`,
+      actor: actorSnapshot,
+      metadata: { targetUserId: id, targetEmail: user.email, changes },
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    })
+  }
+  if (changes.area) {
+    writeAuditLog({
+      resource: 'USER',
+      action: 'AREA_CHANGED',
+      resourceId: id,
+      summary: `${session.email} movió a ${user.email} del área ${changes.area.from ?? 'sin área'} a ${changes.area.to ?? 'sin área'}`,
+      actor: actorSnapshot,
+      metadata: { targetUserId: id, targetEmail: user.email, changes },
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    })
+  }
+  // Si cambió algo más sin ser role/area, lo registramos como update genérico
+  const otherChanges = Object.keys(changes).filter((k) => k !== 'role' && k !== 'area')
+  if (otherChanges.length > 0) {
+    const reactivated = changes.active && changes.active.to === true
+    const deactivated = changes.active && changes.active.to === false
+    writeAuditLog({
+      resource: 'USER',
+      action: reactivated ? 'USER_REACTIVATED' : deactivated ? 'USER_DEACTIVATED' : 'OTHER',
+      resourceId: id,
+      summary: `${session.email} actualizó a ${user.email} (${otherChanges.join(', ')})`,
+      actor: actorSnapshot,
+      metadata: { targetUserId: id, targetEmail: user.email, changes },
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    })
+  }
+
   return apiSuccess(updated)
 })
 
 // ── DELETE /api/admin/users/[id] — Desactivar usuario ──
 export const DELETE = withErrorHandler(async (req: Request, ctx?: Ctx) => {
-  await requireRole('ADMIN')
+  const session = await requireRole('ADMIN')
   const { id } = await ctx!.params
 
   const user = await prisma.user.findUnique({ where: { id } })
@@ -191,6 +242,18 @@ export const DELETE = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   await prisma.user.update({
     where: { id },
     data: { active: false },
+  })
+
+  const meta = extractRequestMeta(req)
+  writeAuditLog({
+    resource: 'USER',
+    action: 'USER_DEACTIVATED',
+    resourceId: id,
+    summary: `${session.email} desactivó la cuenta de ${user.email}`,
+    actor: { id: session.id, email: session.email, role: session.role },
+    metadata: { targetUserId: id, targetEmail: user.email, targetRole: user.role },
+    ip: meta.ip,
+    userAgent: meta.userAgent,
   })
 
   return apiSuccess({ deactivated: true })
