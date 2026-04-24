@@ -158,6 +158,24 @@ export default function AdminSeguridadPage() {
           </section>
         )}
 
+        {/* Acciones rápidas */}
+        <section className="mb-4 flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/seguridad/compliance"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--vc-lime-main)]/40 bg-[var(--vc-lime-main)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--vc-lime-main)] transition-colors hover:bg-[var(--vc-lime-main)]/20"
+          >
+            <ShieldCheck size={14} />
+            Reporte de compliance
+          </Link>
+          <a
+            href={buildExportUrl(filters)}
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--vc-gray-dark)] bg-[var(--vc-black-mid)] px-3 py-1.5 text-xs font-semibold text-[var(--vc-white-soft)] transition-colors hover:border-[var(--vc-lime-main)] hover:text-[var(--vc-lime-main)]"
+          >
+            <Download size={14} />
+            Exportar CSV
+          </a>
+        </section>
+
         {/* Filtros */}
         <section className="mb-4 flex flex-wrap items-center gap-2">
           <select
@@ -388,6 +406,17 @@ function getResourceHref(item: AuditLogItem): string | null {
     default:
       return null
   }
+}
+
+function buildExportUrl(filters: AuditFilters): string {
+  const params = new URLSearchParams()
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v !== undefined && v !== '' && k !== 'page' && k !== 'limit') {
+      params.set(k, String(v))
+    }
+  })
+  const qs = params.toString()
+  return qs ? `/api/admin/audit-logs/export?${qs}` : '/api/admin/audit-logs/export'
 }
 
 function formatRelative(date: Date): string {
