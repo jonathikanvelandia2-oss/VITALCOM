@@ -51,6 +51,32 @@ enum OrderStatus {
   RETURNED
 }
 
+// V37 — Modo de fulfillment activo para un pedido.
+// MANUAL: staff hace el envío con transportadora local + carga tracking a mano.
+// DROPI/EFFI: provider externo crea el envío vía API (requiere credenciales).
+// SHOPIFY_NATIVE: el vendedor Shopify gestiona el fulfillment en su tienda.
+enum FulfillmentMode {
+  MANUAL
+  DROPI
+  EFFI
+  SHOPIFY_NATIVE
+}
+
+// V37 — Acciones registradas en el audit log de fulfillment.
+enum FulfillmentAction {
+  CREATED
+  STATUS_CHANGED
+  TRACKING_ASSIGNED
+  CARRIER_ASSIGNED
+  NOTE_ADDED
+  MANUAL_DISPATCHED
+  DROPI_DISPATCHED
+  DELIVERED_CONFIRMED
+  CANCELLED
+  RETURNED
+  REOPENED
+}
+
 enum OrderSource {
   DIRECT
   ZENDU
@@ -120,6 +146,8 @@ model User {
   inboxSent               InboxMessage[]           @relation("MessageSender")
   inboxReceived           InboxMessage[]           @relation("MessageReceiver")
   orders                  Order[]
+  fulfilledOrders         Order[]                  @relation("OrderFulfiller")
+  fulfillmentLogs         FulfillmentLog[]         @relation("FulfillmentActor")
   pricingCalcs            PricingCalculation[]
   workflows               WorkflowTemplate[]
   courseProgress          CourseProgress[]
@@ -213,7 +241,7 @@ model Product {
   storeOptimizations StoreOptimization[]
   // V33 — Product Studio
   productAssets      ProductAsset[]
-  productLandings   ProductLanding[]
+  productLandings    ProductLanding[]
   ugcPackages        UgcPackage[]
   videoClips         VideoClip[]
   createdAt          DateTime            @default(now())
@@ -260,6 +288,16 @@ model Order {
   notes        String?
   externalRef  String?
 
+  // V37 — Metadata de fulfillment
+  fulfillmentMode FulfillmentMode @default(MANUAL)
+  fulfilledById   String?
+  fulfilledBy     User?           @relation("OrderFulfiller", fields: [fulfilledById], references: [id])
+  fulfilledAt     DateTime?
+  manualCost      Float? // Costo real pagado a transportadora (solo MANUAL)
+  labelUrl        String? // URL guía/etiqueta (Dropi devuelve, manual opcional)
+
+  logs FulfillmentLog[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -269,6 +307,31 @@ model Order {
   @@index([externalRef])
   @@index([source, createdAt])
   @@index([country, createdAt])
+  @@index([fulfillmentMode, status])
+  @@index([fulfilledById, fulfilledAt])
+}
+
+// V37 — Audit trail de cada acción sobre un pedido.
+// Cada cambio de estado, carga de tracking, o envío manual queda acá con
+// actor + timestamp + metadata JSON para tener historia completa — clave
+// para demostrar a Dropi/Effi que confiamos en nuestros flujos.
+model FulfillmentLog {
+  id         String            @id @default(cuid())
+  orderId    String
+  order      Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actorId    String
+  actor      User              @relation("FulfillmentActor", fields: [actorId], references: [id])
+  action     FulfillmentAction
+  fromStatus OrderStatus?
+  toStatus   OrderStatus?
+  message    String?
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
 }
 
 model OrderItem {
@@ -1892,17 +1955,17 @@ model WebhookEvent {
 // Cooldown para evitar spam · log de entregas para debug.
 
 enum ProactiveAlertType {
-  STOCK_LOW           // Stock de un producto cayó bajo umbral en el país del dropshipper
-  ORDER_DISPATCHED    // Uno de sus pedidos pasó a DISPATCHED
-  ORDER_DELIVERED     // Uno de sus pedidos pasó a DELIVERED
-  DAILY_SUMMARY       // Resumen del día (pedidos + revenue + P&G)
-  ROAS_DROP           // ROAS cayó bajo umbral
+  STOCK_LOW // Stock de un producto cayó bajo umbral en el país del dropshipper
+  ORDER_DISPATCHED // Uno de sus pedidos pasó a DISPATCHED
+  ORDER_DELIVERED // Uno de sus pedidos pasó a DELIVERED
+  DAILY_SUMMARY // Resumen del día (pedidos + revenue + P&G)
+  ROAS_DROP // ROAS cayó bajo umbral
 }
 
 enum ProactiveAlertChannel {
-  IN_APP              // Solo Notification (bell icon)
-  WHATSAPP            // Solo WhatsApp
-  BOTH                // Los dos
+  IN_APP // Solo Notification (bell icon)
+  WHATSAPP // Solo WhatsApp
+  BOTH // Los dos
 }
 
 model ProactiveAlert {
@@ -1929,15 +1992,15 @@ model ProactiveAlert {
 }
 
 model ProactiveAlertLog {
-  id           String         @id @default(cuid())
+  id           String                @id @default(cuid())
   alertId      String
-  alert        ProactiveAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  alert        ProactiveAlert        @relation(fields: [alertId], references: [id], onDelete: Cascade)
   // Contexto del disparo
   payload      Json // snapshot de los datos que motivaron el alert
   // Envío
-  deliveredAt  DateTime       @default(now())
+  deliveredAt  DateTime              @default(now())
   channel      ProactiveAlertChannel
-  whatsappSent Boolean        @default(false)
+  whatsappSent Boolean               @default(false)
   notifyId     String? // id de Notification si se creó
   errorMessage String?
 
@@ -1952,27 +2015,27 @@ model ProactiveAlertLog {
 // disparar flujos de retención cuando cae de ACTIVE → AT_RISK.
 
 enum UserHealthSegment {
-  NEW      // Registrado hace < 7 días (no se califica aún)
-  ACTIVE   // Score >= 60
-  AT_RISK  // Score 30-59
-  CHURNED  // Score < 30
+  NEW // Registrado hace < 7 días (no se califica aún)
+  ACTIVE // Score >= 60
+  AT_RISK // Score 30-59
+  CHURNED // Score < 30
 }
 
 model UserHealthScore {
-  id             String            @id @default(cuid())
-  userId         String            @unique
-  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                     String             @id @default(cuid())
+  userId                 String             @unique
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Score actual 0-100
-  score          Int               @default(0)
-  segment        UserHealthSegment @default(NEW)
+  score                  Int                @default(0)
+  segment                UserHealthSegment  @default(NEW)
   // Desglose por factor (JSON con nombres de factor + puntos)
-  breakdown      Json              @default("{}")
+  breakdown              Json               @default("{}")
   // Trend
-  previousScore  Int?
-  scoreDelta     Int?
-  previousSegment UserHealthSegment?
+  previousScore          Int?
+  scoreDelta             Int?
+  previousSegment        UserHealthSegment?
   // Metadatos
-  computedAt     DateTime          @default(now())
+  computedAt             DateTime           @default(now())
   // Retención: último flujo disparado
   lastRetentionTriggerAt DateTime?
 
@@ -2046,18 +2109,18 @@ enum AssetQualityScore {
 }
 
 model ProductAsset {
-  id              String       @id @default(cuid())
+  id              String            @id @default(cuid())
   productId       String
-  product         Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product         Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
   // Origen Drive (o edit)
-  driveFileId     String       @unique
+  driveFileId     String            @unique
   driveFolderPath String
   driveFolderType String
   driveLastSyncAt DateTime?
   // Clasificación comercial
   type            AssetType
   angle           SalesAngle?
-  format          AssetFormat  @default(FREEFORM)
+  format          AssetFormat       @default(FREEFORM)
   // Contenido Cloudinary
   cloudinaryId    String?
   cloudinaryUrl   String?
@@ -2067,26 +2130,26 @@ model ProductAsset {
   durationSec     Int?
   fileSizeBytes   Int?
   // Segmentación
-  persona         String[]     @default([])
-  country         String[]     @default([])
-  language        String       @default("es_CO")
+  persona         String[]          @default([])
+  country         String[]          @default([])
+  language        String            @default("es_CO")
   // Metadata editorial
   title           String?
   caption         String?
   altText         String?
-  assetTags       String[]     @default([])
+  assetTags       String[]          @default([])
   // Estado
-  status          AssetStatus  @default(DRAFT)
+  status          AssetStatus       @default(DRAFT)
   quality         AssetQualityScore @default(UNRATED)
-  usedAsDefault   Boolean      @default(false)
+  usedAsDefault   Boolean           @default(false)
   heroRank        Int?
   // Trazabilidad
   syncedBy        String?
   reviewedBy      String?
   reviewedAt      DateTime?
   rejectionReason String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   videoCutsFromMe VideoClip[] @relation("SourceAsset")
   edits           AssetEdit[]
@@ -2126,13 +2189,13 @@ model AssetEdit {
 }
 
 model ProductLanding {
-  id              String    @id @default(cuid())
+  id              String      @id @default(cuid())
   productId       String
-  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product         Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   // null = template base Vitalcom; con id = versión del dropshipper
   dropshipperId   String?
-  dropshipper     User?     @relation(fields: [dropshipperId], references: [id], onDelete: Cascade)
-  isTemplate      Boolean   @default(false)
+  dropshipper     User?       @relation(fields: [dropshipperId], references: [id], onDelete: Cascade)
+  isTemplate      Boolean     @default(false)
   clonedFromId    String?
   // HERO
   heroHeadline    String
@@ -2142,37 +2205,37 @@ model ProductLanding {
   heroRating      Float?
   heroRatingCount Int?
   // Secciones
-  benefits        Json      @default("[]")
-  painPoints      Json      @default("[]")
-  howItWorks      Json      @default("[]")
-  testimonials    Json      @default("[]")
-  faq             Json      @default("[]")
-  ugcClipIds      String[]  @default([])
-  galleryAssetIds String[]  @default([])
+  benefits        Json        @default("[]")
+  painPoints      Json        @default("[]")
+  howItWorks      Json        @default("[]")
+  testimonials    Json        @default("[]")
+  faq             Json        @default("[]")
+  ugcClipIds      String[]    @default([])
+  galleryAssetIds String[]    @default([])
   // Pricing
   priceOverride   Int?
   marginPercent   Float?
   currencyCode    String?
   // CTA
-  ctaPrimary      String    @default("Agregar a mi tienda")
+  ctaPrimary      String      @default("Agregar a mi tienda")
   ctaSecondary    String?
   ctaUrl          String?
   // SEO
   seoTitle        String?
   seoDescription  String?
-  seoKeywords     String[]  @default([])
+  seoKeywords     String[]    @default([])
   ogImageAssetId  String?
   // Publicación
-  status          String    @default("draft")
+  status          String      @default("draft")
   publishedAt     DateTime?
   shopifyPageId   String?
   shopifyPushedAt DateTime?
   // Analytics
-  viewCount       Int       @default(0)
-  ctaClickCount   Int       @default(0)
+  viewCount       Int         @default(0)
+  ctaClickCount   Int         @default(0)
   lastViewedAt    DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   @@unique([productId, dropshipperId])
   @@index([productId, status])
@@ -2180,27 +2243,27 @@ model ProductLanding {
 }
 
 model UgcPackage {
-  id              String     @id @default(cuid())
-  productId       String
-  product         Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  dropshipperId   String?
-  angle           SalesAngle
-  persona         String
-  platform        String
-  durationSec     Int
-  hookOptions     Json
-  shotList        Json
-  voiceoverScript String
-  bRollSuggested  Json
-  captionOverlays Json
-  musicStyle      String
-  hashtags        String[]   @default([])
-  bestPostTimes   Json
-  pdfShotListUrl  String?
-  timesUsed       Int        @default(0)
-  llmModel        String
-  costUsd         Float      @default(0)
-  createdAt       DateTime   @default(now())
+  id                 String      @id @default(cuid())
+  productId          String
+  product            Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  dropshipperId      String?
+  angle              SalesAngle
+  persona            String
+  platform           String
+  durationSec        Int
+  hookOptions        Json
+  shotList           Json
+  voiceoverScript    String
+  bRollSuggested     Json
+  captionOverlays    Json
+  musicStyle         String
+  hashtags           String[]    @default([])
+  bestPostTimes      Json
+  pdfShotListUrl     String?
+  timesUsed          Int         @default(0)
+  llmModel           String
+  costUsd            Float       @default(0)
+  createdAt          DateTime    @default(now())
   videoClipsProduced VideoClip[]
 
   @@index([productId, angle])
@@ -2224,31 +2287,31 @@ enum VideoStatus {
 }
 
 model VideoClip {
-  id              String        @id @default(cuid())
-  productId       String
-  product         Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  dropshipperId   String?
-  provider        VideoProvider
-  sourceAssetId   String?
-  sourceAsset     ProductAsset? @relation("SourceAsset", fields: [sourceAssetId], references: [id])
-  ugcPackageId    String?
-  ugcPackage      UgcPackage?   @relation(fields: [ugcPackageId], references: [id])
-  prompt          String?
-  durationSec     Int
-  format          AssetFormat
-  scenesConfig    Json?
-  status          VideoStatus   @default(QUEUED)
-  queuedAt        DateTime      @default(now())
-  startedAt       DateTime?
-  renderedAt      DateTime?
-  failureReason   String?
-  outputUrl       String?
-  outputAssetId   String?
-  thumbnailUrl    String?
-  captionsVttUrl  String?
-  estimatedCostUsd Float        @default(0)
-  actualCostUsd    Float        @default(0)
-  createdAt       DateTime      @default(now())
+  id               String        @id @default(cuid())
+  productId        String
+  product          Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  dropshipperId    String?
+  provider         VideoProvider
+  sourceAssetId    String?
+  sourceAsset      ProductAsset? @relation("SourceAsset", fields: [sourceAssetId], references: [id])
+  ugcPackageId     String?
+  ugcPackage       UgcPackage?   @relation(fields: [ugcPackageId], references: [id])
+  prompt           String?
+  durationSec      Int
+  format           AssetFormat
+  scenesConfig     Json?
+  status           VideoStatus   @default(QUEUED)
+  queuedAt         DateTime      @default(now())
+  startedAt        DateTime?
+  renderedAt       DateTime?
+  failureReason    String?
+  outputUrl        String?
+  outputAssetId    String?
+  thumbnailUrl     String?
+  captionsVttUrl   String?
+  estimatedCostUsd Float         @default(0)
+  actualCostUsd    Float         @default(0)
+  createdAt        DateTime      @default(now())
 
   @@index([productId, status])
   @@index([dropshipperId, status])
@@ -2293,42 +2356,42 @@ model VideoBudgetLimit {
 // una narrativa accionable. El dropshipper abre UNA cosa en
 // lugar de navegar 5 pantallas.
 model WeeklyInsight {
-  id                String             @id @default(cuid())
-  userId            String
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              String             @id @default(cuid())
+  userId          String
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   // Rango temporal (inclusive)
-  weekStart         DateTime           // Lunes 00:00:00 UTC
-  weekEnd           DateTime           // Domingo 23:59:59 UTC
+  weekStart       DateTime // Lunes 00:00:00 UTC
+  weekEnd         DateTime // Domingo 23:59:59 UTC
   // Métricas P&G del período
-  revenue           Float              @default(0)
-  revenuePrev       Float              @default(0)
-  revenueDeltaPct   Float              @default(0)
-  orderCount        Int                @default(0)
-  orderCountPrev    Int                @default(0)
-  netProfit         Float              @default(0)
-  roas              Float              @default(0)
-  breakEvenRoas     Float              @default(0)
+  revenue         Float              @default(0)
+  revenuePrev     Float              @default(0)
+  revenueDeltaPct Float              @default(0)
+  orderCount      Int                @default(0)
+  orderCountPrev  Int                @default(0)
+  netProfit       Float              @default(0)
+  roas            Float              @default(0)
+  breakEvenRoas   Float              @default(0)
   // Health Score snapshot
-  healthScore       Int                @default(0)
-  healthScorePrev   Int?
-  healthDelta       Int                @default(0)
-  segment           UserHealthSegment?
+  healthScore     Int                @default(0)
+  healthScorePrev Int?
+  healthDelta     Int                @default(0)
+  segment         UserHealthSegment?
   // Top producto de la semana
-  topProductId      String?
-  topProductName    String?
-  topProductSales   Int?
+  topProductId    String?
+  topProductName  String?
+  topProductSales Int?
   // Narrativa generada (sin LLM por defecto, pero compatible)
-  headline          String             // "Subiste 23% vs la semana pasada"
-  highlights        Json               @default("[]") // Array<{label, value, trend}>
-  recommendations   Json               @default("[]") // Array<{priority, title, action, href}>
+  headline        String // "Subiste 23% vs la semana pasada"
+  highlights      Json               @default("[]") // Array<{label, value, trend}>
+  recommendations Json               @default("[]") // Array<{priority, title, action, href}>
   // Benchmarking anónimo (opcional, se llena si hay suficientes peers)
-  tierAvgRevenue    Float?
-  tierPercentile    Int?               // 0-100 del usuario dentro de su segment
+  tierAvgRevenue  Float?
+  tierPercentile  Int? // 0-100 del usuario dentro de su segment
   // Estado
-  generatedAt       DateTime           @default(now())
-  readAt            DateTime?
+  generatedAt     DateTime           @default(now())
+  readAt          DateTime?
   // Fuente (para auditar si vino de cron o de trigger manual)
-  source            String             @default("manual")
+  source          String             @default("manual")
 
   @@unique([userId, weekStart])
   @@index([userId, weekStart(sort: Desc)])

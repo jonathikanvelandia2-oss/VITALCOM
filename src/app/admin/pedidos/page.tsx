@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Search, Loader2, ChevronDown } from 'lucide-react'
+import Link from 'next/link'
+import { Plus, Search, Loader2, ChevronDown, ExternalLink } from 'lucide-react'
 import { AdminTopbar } from '@/components/admin/AdminTopbar'
 import { useOrders, useUpdateOrderStatus } from '@/hooks/useOrders'
 
@@ -110,7 +111,16 @@ export default function PedidosPage() {
                   const itemCount = o.items?.reduce((sum: number, i: any) => sum + i.quantity, 0) ?? 0
                   return (
                     <tr key={o.id} className="text-xs" style={{ borderTop: '1px solid var(--vc-gray-dark)', color: 'var(--vc-white-dim)' }}>
-                      <td className="py-3 font-mono font-bold" style={{ color: 'var(--vc-white-soft)' }}>{o.number}</td>
+                      <td className="py-3 font-mono font-bold">
+                        <Link
+                          href={`/admin/pedidos/${o.id}`}
+                          className="inline-flex items-center gap-1 transition hover:text-[var(--vc-lime-main)]"
+                          style={{ color: 'var(--vc-white-soft)' }}
+                        >
+                          {o.number}
+                          <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                        </Link>
+                      </td>
                       <td className="py-3 font-mono" style={{ color: 'var(--vc-gray-mid)' }}>
                         {new Date(o.createdAt).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' })}
                       </td>
