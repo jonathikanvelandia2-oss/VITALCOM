@@ -1,6 +1,7 @@
 import { CommunitySidebar } from '@/components/community/CommunitySidebar'
 import { CommunityMobileNav } from '@/components/community/CommunityMobileNav'
 import { VitaWidget } from '@/components/assistant/VitaWidget'
+import { OnboardingWidget } from '@/components/community/OnboardingWidget'
 
 export default function CommunityLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export default function CommunityLayout({ children }: { children: React.ReactNod
       <div className="flex min-w-0 flex-1 flex-col pb-16 lg:pb-0">{children}</div>
       <CommunityMobileNav />
       <VitaWidget />
+      <OnboardingWidget />
     </div>
   )
 }

@@ -12,7 +12,7 @@ export async function GET() {
     deployedAt: process.env.VERCEL_GIT_COMMIT_AUTHOR_LOGIN
       ? new Date().toISOString()
       : 'local-dev',
-    version: '2.26.0-security-pitch-pack',
+    version: '2.27.0-onboarding-interactive',
     routes: {
       presentation: '/presentacion',
       presentationStatic: '/presentacion.html',

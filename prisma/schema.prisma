@@ -140,6 +140,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // V42 — Onboarding (pasos se derivan del estado existente del user)
+  onboardingDismissedAt DateTime?
+
   // Relaciones
   posts                   Post[]
   comments                Comment[]
