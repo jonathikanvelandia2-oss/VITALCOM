@@ -63,10 +63,15 @@ export const POST = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     },
   })
 
-  // Actualizar timestamp del hilo
+  // V39 — Primera respuesta de staff marca firstResponseAt (SLA met).
+  // updatedAt también avanza para que las listas se re-ordenen.
+  const threadUpdate: Record<string, unknown> = { updatedAt: new Date() }
+  if (isStaff(session.role) && !thread.firstResponseAt) {
+    threadUpdate.firstResponseAt = new Date()
+  }
   await prisma.inboxThread.update({
     where: { id: threadId },
-    data: { updatedAt: new Date() },
+    data: threadUpdate,
   })
 
   // Notificar a destinatarios (no al sender):

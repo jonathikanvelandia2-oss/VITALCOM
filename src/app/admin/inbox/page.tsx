@@ -1,10 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
-import { Inbox, Plus, Send, Loader2, X, Check, CheckCircle2, CircleDot, AlertTriangle, Flame } from 'lucide-react'
+import {
+  Inbox, Plus, Send, Loader2, X, Check, CheckCircle2, CircleDot, AlertTriangle, Flame,
+  Clock, TrendingUp, UserPlus, Shield, Timer,
+} from 'lucide-react'
 import { AdminTopbar } from '@/components/admin/AdminTopbar'
-import { useThreads, useThreadMessages, useCreateThread, useSendMessage, useInboxUnread, useUpdateThread } from '@/hooks/useInbox'
+import {
+  useThreads, useThreadMessages, useCreateThread, useSendMessage, useInboxUnread, useUpdateThread,
+  useInboxStats, useAssignableUsers,
+} from '@/hooks/useInbox'
+import { computeSlaStatus, formatSlaStatus, hoursUntilSlaBreach, type PriorityLite } from '@/lib/inbox/helpers'
 
 const PRIO_COLORS: Record<string, { bg: string; fg: string }> = {
   urgent: { bg: 'rgba(255, 71, 87, 0.18)', fg: 'var(--vc-error)' },
@@ -39,7 +46,8 @@ export default function InboxPage() {
   return (
     <>
       <AdminTopbar title="Inbox interno" subtitle={isLoading ? 'Cargando...' : `${total} hilos · ${unread.data?.total ?? 0} sin leer`} />
-      <div className="flex flex-1 overflow-hidden" style={{ minHeight: 'calc(100vh - 130px)' }}>
+      <StatsStrip />
+      <div className="flex flex-1 overflow-hidden" style={{ minHeight: 'calc(100vh - 200px)' }}>
         {/* Panel izquierdo: hilos */}
         <div className="flex w-full flex-col md:w-96 md:shrink-0" style={{ borderRight: '1px solid var(--vc-gray-dark)' }}>
           <div className="space-y-3 p-4">
@@ -135,11 +143,21 @@ export default function InboxPage() {
                       <p className="truncate text-[10px]" style={{ color: 'var(--vc-white-dim)' }}>
                         {t.lastMessage ? `${t.lastMessage.senderName}: ${t.lastMessage.body.slice(0, 50)}` : 'Sin mensajes'}
                       </p>
-                      <div className="mt-0.5 flex items-center gap-2">
+                      <div className="mt-0.5 flex items-center gap-1.5">
                         <span className="rounded px-1 py-0.5 text-[8px] font-bold"
                           style={{ background: 'var(--vc-black-soft)', color: 'var(--vc-lime-main)', border: '1px solid var(--vc-gray-dark)' }}>
                           {AREA_LABELS[t.area] ?? t.area}
                         </span>
+                        <SlaBadge thread={t} />
+                        {t.assignedTo && (
+                          <span
+                            className="flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold"
+                            style={{ background: 'var(--vc-info)', color: 'var(--vc-black)' }}
+                            title={`Asignado a ${t.assignedTo.name ?? t.assignedTo.email}`}
+                          >
+                            {(t.assignedTo.name ?? t.assignedTo.email ?? '?').charAt(0).toUpperCase()}
+                          </span>
+                        )}
                         {t.resolved && <Check size={10} color="var(--vc-lime-main)" />}
                       </div>
                     </div>
@@ -183,6 +201,19 @@ function ThreadMessages({ threadId }: { threadId: string }) {
   const thread = data?.thread
   const messages = data?.messages ?? []
 
+  const assignable = useAssignableUsers(thread?.area as string | undefined)
+
+  function handleAssign(userId: string) {
+    updateThread.mutate({ assignedToId: userId === 'none' ? null : userId } as any)
+  }
+
+  function handleTakeThread() {
+    if (!myId) return
+    updateThread.mutate({ assignedToId: myId } as any)
+  }
+
+  const currentAssigneeId = (thread as any)?.assignedTo?.id ?? null
+
   function handleSend() {
     if (!body.trim()) return
     sendMessage.mutate({ body }, { onSuccess: () => setBody('') })
@@ -224,7 +255,7 @@ function ThreadMessages({ threadId }: { threadId: string }) {
                 </span>
               )}
             </div>
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="rounded px-1.5 py-0.5 text-[9px] font-bold"
                 style={{ background: 'var(--vc-black-soft)', color: 'var(--vc-lime-main)', border: '1px solid var(--vc-gray-dark)' }}>
                 {AREA_LABELS[thread.area] ?? thread.area}
@@ -235,6 +266,7 @@ function ThreadMessages({ threadId }: { threadId: string }) {
                 {thread.priority === 'high' && <AlertTriangle size={10} />}
                 {thread.priority}
               </span>
+              <SlaBadge thread={thread as any} />
             </div>
           </div>
 
@@ -257,6 +289,46 @@ function ThreadMessages({ threadId }: { threadId: string }) {
                 <option key={k} value={k}>{v}</option>
               ))}
             </select>
+            {/* Asignación: dropdown con lista del área + botón "tomar" */}
+            <select
+              value={currentAssigneeId ?? 'none'}
+              onChange={(e) => handleAssign(e.target.value)}
+              disabled={updateThread.isPending || assignable.isLoading}
+              className="rounded-lg px-2 py-1.5 text-[10px] font-bold outline-none"
+              style={{
+                background: currentAssigneeId ? 'rgba(60,198,255,0.1)' : 'var(--vc-black-soft)',
+                color: currentAssigneeId ? 'var(--vc-info)' : 'var(--vc-white-soft)',
+                border: `1px solid ${currentAssigneeId ? 'rgba(60,198,255,0.4)' : 'var(--vc-gray-dark)'}`,
+                fontFamily: 'var(--font-heading)',
+                maxWidth: '160px',
+              }}
+              title={currentAssigneeId ? 'Cambiar asignación' : 'Asignar staff'}
+            >
+              <option value="none">Sin asignar</option>
+              {(assignable.data?.items ?? []).map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name ?? u.email.split('@')[0]} · {u.role}
+                </option>
+              ))}
+            </select>
+
+            {currentAssigneeId !== myId && (
+              <button
+                onClick={handleTakeThread}
+                disabled={updateThread.isPending}
+                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition-colors"
+                style={{
+                  background: 'rgba(60,198,255,0.1)',
+                  color: 'var(--vc-info)',
+                  border: '1px solid rgba(60,198,255,0.4)',
+                  fontFamily: 'var(--font-heading)',
+                }}
+                title="Asignarme este hilo"
+              >
+                <UserPlus size={10} /> Tomar
+              </button>
+            )}
+
             <button onClick={handleToggleResolved} disabled={updateThread.isPending}
               className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-bold transition-colors"
               style={{
@@ -344,6 +416,121 @@ function ThreadMessages({ threadId }: { threadId: string }) {
         </button>
       </div>
     </div>
+  )
+}
+
+// ── V39: Stats Strip operativo ─────────────────────────
+function StatsStrip() {
+  const q = useInboxStats()
+  const s = q.data?.stats
+
+  if (q.isLoading || !s) {
+    return (
+      <div
+        className="flex items-center gap-3 border-b px-4 py-3 md:px-6"
+        style={{ background: 'var(--vc-black-mid)', borderColor: 'var(--vc-gray-dark)' }}
+      >
+        <Loader2 size={14} className="animate-spin" style={{ color: 'var(--vc-lime-main)' }} />
+        <span className="text-[10px]" style={{ color: 'var(--vc-white-dim)' }}>Cargando KPIs…</span>
+      </div>
+    )
+  }
+
+  const complianceTone =
+    s.sla.complianceRate >= 90
+      ? 'var(--vc-lime-main)'
+      : s.sla.complianceRate >= 70
+        ? 'var(--vc-warning)'
+        : 'var(--vc-error)'
+
+  return (
+    <div
+      className="grid grid-cols-2 gap-2 border-b px-4 py-3 md:grid-cols-5 md:px-6"
+      style={{ background: 'var(--vc-black-mid)', borderColor: 'var(--vc-gray-dark)' }}
+    >
+      <StatChip icon={<CircleDot size={12} />} label="Abiertos" value={s.open} />
+      <StatChip icon={<Flame size={12} />} label="Urgentes" value={s.byPriority.urgent ?? 0} tone="error" />
+      <StatChip
+        icon={<Shield size={12} />}
+        label={`SLA ${s.sla.complianceRate}%`}
+        value={`${s.sla.onTrack + s.sla.atRisk}/${s.sla.onTrack + s.sla.atRisk + s.sla.breached}`}
+        tone={complianceTone as string}
+      />
+      <StatChip icon={<UserPlus size={12} />} label="Sin asignar" value={s.byAssignment.unassigned} />
+      <StatChip
+        icon={<Timer size={12} />}
+        label="Más viejo"
+        value={s.oldestOpenHours ? `${s.oldestOpenHours}h` : '—'}
+      />
+    </div>
+  )
+}
+
+function StatChip({
+  icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string | number
+  tone?: 'error' | string
+}) {
+  const color =
+    tone === 'error'
+      ? 'var(--vc-error)'
+      : typeof tone === 'string'
+        ? tone
+        : 'var(--vc-lime-main)'
+  return (
+    <div className="flex items-center gap-2">
+      <span style={{ color }}>{icon}</span>
+      <div className="flex flex-col">
+        <span className="font-mono text-sm font-black" style={{ color: 'var(--vc-white-soft)' }}>
+          {value}
+        </span>
+        <span className="text-[9px] uppercase tracking-wider" style={{ color: 'var(--vc-gray-mid)' }}>
+          {label}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ── V39: SLA badge inline ──────────────────────────────
+function SlaBadge({ thread }: { thread: any }) {
+  const status = useMemo(() => {
+    if (thread.resolved) return null
+    return computeSlaStatus(
+      thread.priority as PriorityLite,
+      thread.createdAt,
+      thread.firstResponseAt ?? null,
+    )
+  }, [thread.priority, thread.createdAt, thread.firstResponseAt, thread.resolved])
+
+  if (!status || status === 'met') return null
+
+  const meta = formatSlaStatus(status)
+  const colorMap: Record<string, { bg: string; fg: string; border: string }> = {
+    success: { bg: 'rgba(198,255,60,0.1)', fg: 'var(--vc-lime-main)', border: 'rgba(198,255,60,0.4)' },
+    info: { bg: 'rgba(60,198,255,0.1)', fg: 'var(--vc-info)', border: 'rgba(60,198,255,0.4)' },
+    warning: { bg: 'rgba(255,184,0,0.12)', fg: 'var(--vc-warning)', border: 'rgba(255,184,0,0.4)' },
+    error: { bg: 'rgba(255,71,87,0.12)', fg: 'var(--vc-error)', border: 'rgba(255,71,87,0.4)' },
+  }
+  const c = colorMap[meta.tone]
+
+  const hours = hoursUntilSlaBreach(thread.priority as PriorityLite, thread.createdAt)
+  const suffix = status === 'breached' ? `+${Math.abs(hours).toFixed(0)}h` : `${hours.toFixed(0)}h`
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[8px] font-bold"
+      style={{ background: c.bg, color: c.fg, border: `1px solid ${c.border}` }}
+      title={`${meta.label} · ${suffix} vs deadline`}
+    >
+      <Clock size={8} /> {meta.label}
+    </span>
   )
 }
 

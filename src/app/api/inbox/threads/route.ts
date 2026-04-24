@@ -47,6 +47,7 @@ export const GET = withErrorHandler(async (req: Request) => {
           },
         },
         _count: { select: { messages: true } },
+        assignedTo: { select: { id: true, name: true, email: true, avatar: true, area: true } },
       },
       orderBy: [{ updatedAt: 'desc' }],
       skip,
@@ -70,6 +71,10 @@ export const GET = withErrorHandler(async (req: Request) => {
       resolved: t.resolved,
       messageCount: t._count.messages,
       unreadCount,
+      // V39 — campos nuevos para SLA + asignación
+      assignedTo: t.assignedTo,
+      firstResponseAt: t.firstResponseAt,
+      resolvedAt: t.resolvedAt,
       lastMessage: lastMessage ? {
         body: lastMessage.body,
         senderName: lastMessage.sender.name,

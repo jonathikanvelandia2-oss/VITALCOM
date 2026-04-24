@@ -79,7 +79,7 @@ export function useSendMessage(threadId: string) {
   })
 }
 
-/** Actualizar hilo (resolver/reasignar/priorizar) — solo staff */
+/** Actualizar hilo (resolver/reasignar/priorizar/asignar) — solo staff */
 export function useUpdateThread(threadId: string) {
   const qc = useQueryClient()
   return useMutation({
@@ -89,6 +89,58 @@ export function useUpdateThread(threadId: string) {
       qc.invalidateQueries({ queryKey: ['threads'] })
       qc.invalidateQueries({ queryKey: ['threadMessages', threadId] })
       qc.invalidateQueries({ queryKey: ['inboxUnread'] })
+      qc.invalidateQueries({ queryKey: ['inbox-stats'] })
     },
+  })
+}
+
+// V39 — Hooks operativos ──────────────────────────────
+
+export type InboxStats = {
+  scope: string
+  stats: {
+    total: number
+    open: number
+    resolved: number
+    byPriority: Record<string, number>
+    byArea: Record<string, number>
+    byAssignment: { assigned: number; unassigned: number }
+    sla: {
+      met: number
+      onTrack: number
+      atRisk: number
+      breached: number
+      complianceRate: number
+    }
+    avgResolutionHours: number | null
+    oldestOpenHours: number | null
+  }
+}
+
+/** Stats operativas del inbox — staff dashboard */
+export function useInboxStats() {
+  return useQuery<InboxStats>({
+    queryKey: ['inbox-stats'],
+    queryFn: () => fetcher('/api/inbox/stats'),
+    refetchInterval: 30000,
+  })
+}
+
+/** Usuarios asignables (filtrable por área) */
+export type AssignableUser = {
+  id: string
+  name: string | null
+  email: string
+  area: string | null
+  role: string
+  avatar: string | null
+}
+
+export function useAssignableUsers(area?: string) {
+  const qs = area ? `?area=${area}` : ''
+  return useQuery<{ items: AssignableUser[] }>({
+    queryKey: ['inbox-assignable', area],
+    queryFn: () => fetcher(`/api/inbox/assignable${qs}`),
+    staleTime: 60000,
   })
 }

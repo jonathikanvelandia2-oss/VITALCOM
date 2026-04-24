@@ -14,6 +14,7 @@ export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     where: { id },
     include: {
       _count: { select: { messages: true } },
+      assignedTo: { select: { id: true, name: true, email: true, avatar: true, area: true } },
     },
   })
 
@@ -35,13 +36,17 @@ export const GET = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     priority: thread.priority,
     resolved: thread.resolved,
     messageCount: thread._count.messages,
+    assignedTo: thread.assignedTo,
+    firstResponseAt: thread.firstResponseAt,
+    resolvedAt: thread.resolvedAt,
     createdAt: thread.createdAt,
     updatedAt: thread.updatedAt,
   })
 })
 
-// ── PATCH /api/inbox/threads/[id] — Resolver / reasignar / priorizar ─
+// ── PATCH /api/inbox/threads/[id] — Resolver / reasignar / priorizar / asignar ─
 // Solo staff. Registra la acción como mensaje de sistema en el hilo.
+// V39: soporta assignedToId + guarda resolvedAt/resolvedById para SLA tracking.
 export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   const session = await requireSession()
   if (!isStaff(session.role)) return apiError('Solo staff', 403, 'FORBIDDEN')
@@ -63,14 +68,41 @@ export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
   if (data.area && data.area !== thread.area) {
     audits.push(`reasignó el hilo de ${thread.area} a ${data.area}`)
   }
+  if (data.assignedToId !== undefined && data.assignedToId !== thread.assignedToId) {
+    if (data.assignedToId === null) {
+      audits.push('quitó la asignación')
+    } else if (data.assignedToId === session.id) {
+      audits.push('tomó el hilo')
+    } else {
+      const assignee = await prisma.user.findUnique({
+        where: { id: data.assignedToId },
+        select: { name: true, email: true },
+      })
+      const label = assignee?.name ?? assignee?.email ?? data.assignedToId.slice(0, 6)
+      audits.push(`asignó el hilo a ${label}`)
+    }
+  }
+
+  // V39 — resolvedAt / resolvedById atómicos
+  const updateData: Record<string, unknown> = {
+    ...(data.resolved !== undefined ? { resolved: data.resolved } : {}),
+    ...(data.priority ? { priority: data.priority } : {}),
+    ...(data.area ? { area: data.area } : {}),
+    ...(data.assignedToId !== undefined ? { assignedToId: data.assignedToId } : {}),
+  }
+  if (data.resolved !== undefined && data.resolved !== thread.resolved) {
+    if (data.resolved) {
+      updateData.resolvedAt = new Date()
+      updateData.resolvedById = session.id
+    } else {
+      updateData.resolvedAt = null
+      updateData.resolvedById = null
+    }
+  }
 
   const updated = await prisma.inboxThread.update({
     where: { id },
-    data: {
-      ...(data.resolved !== undefined ? { resolved: data.resolved } : {}),
-      ...(data.priority ? { priority: data.priority } : {}),
-      ...(data.area ? { area: data.area } : {}),
-    },
+    data: updateData,
   })
 
   // Log de auditoría como mensaje de sistema (senderId = quien hizo la acción).
@@ -90,5 +122,7 @@ export const PATCH = withErrorHandler(async (req: Request, ctx?: Ctx) => {
     area: updated.area,
     priority: updated.priority,
     resolved: updated.resolved,
+    assignedToId: updated.assignedToId,
+    resolvedAt: updated.resolvedAt,
   })
 })

@@ -22,6 +22,7 @@ export const updateThreadSchema = z.object({
   resolved: z.boolean().optional(),
   priority: z.enum(PRIORITIES).optional(),
   area: z.enum(AREAS).optional(),
+  assignedToId: z.string().nullable().optional(), // V39 — asignar/desasignar
 }).refine((data) => Object.keys(data).length > 0, { message: 'Debes modificar al menos un campo' })
 
 export const threadFiltersSchema = z.object({

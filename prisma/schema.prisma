@@ -149,6 +149,8 @@ model User {
   fulfilledOrders         Order[]                  @relation("OrderFulfiller")
   fulfillmentLogs         FulfillmentLog[]         @relation("FulfillmentActor")
   channelClicks           ChannelClick[]
+  inboxAssigned           InboxThread[]            @relation("InboxAssignee")
+  inboxResolved           InboxThread[]            @relation("InboxResolver")
   pricingCalcs            PricingCalculation[]
   workflows               WorkflowTemplate[]
   courseProgress          CourseProgress[]
@@ -354,14 +356,27 @@ model OrderItem {
 // ─────────────────────────────────────────────────────────
 
 model InboxThread {
-  id        String         @id @default(cuid())
-  subject   String
-  area      Area
-  priority  String         @default("normal")
-  resolved  Boolean        @default(false)
+  id       String  @id @default(cuid())
+  subject  String
+  area     Area
+  priority String  @default("normal")
+  resolved Boolean @default(false)
+
+  // V39 — Asignación + SLA tracking
+  assignedToId    String?
+  assignedTo      User?     @relation("InboxAssignee", fields: [assignedToId], references: [id])
+  firstResponseAt DateTime? // primera respuesta de staff — marca SLA met
+  resolvedAt      DateTime?
+  resolvedById    String?
+  resolvedBy      User?     @relation("InboxResolver", fields: [resolvedById], references: [id])
+
   messages  InboxMessage[]
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
+
+  @@index([area, resolved, priority])
+  @@index([assignedToId, resolved])
+  @@index([resolved, createdAt])
 }
 
 model InboxMessage {
