@@ -64,7 +64,12 @@ export const GET = withErrorHandler(async (req: Request) => {
     return redirectWithError('state_missing', 'Sesión OAuth expirada. Reintenta.')
   }
 
-  const [storedState, storedUserId, storedShop] = stored.split('.')
+  // Soporte legacy: cookies previas al fix del separador usaban "." que rompía
+  // con shops {x}.myshopify.com. Intentamos primero con "|" (nuevo), fallback "."
+  // (cookies en vuelo durante el deploy).
+  const parts = stored.includes('|') ? stored.split('|') : stored.split('.')
+  const [storedState, storedUserId, ...rest] = parts
+  const storedShop = rest.join(stored.includes('|') ? '|' : '.')
   if (storedState !== state) {
     return redirectWithError('state_mismatch', 'State inválido (posible CSRF)')
   }

@@ -38,8 +38,10 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   const state = generateState()
 
-  // Payload firmado: state + userId + shop (lo validamos todo en callback)
-  const payload = `${state}.${session.id}.${shop}`
+  // Payload firmado: state + userId + shop (lo validamos todo en callback).
+  // Separador "|" — NO usar "." porque el shop contiene puntos
+  // ({shop}.myshopify.com) y rompe el split del callback.
+  const payload = `${state}|${session.id}|${shop}`
 
   const cookieStore = await cookies()
   cookieStore.set(STATE_COOKIE, payload, {

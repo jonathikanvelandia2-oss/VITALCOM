@@ -12,7 +12,7 @@ export async function GET() {
     deployedAt: process.env.VERCEL_GIT_COMMIT_AUTHOR_LOGIN
       ? new Date().toISOString()
       : 'local-dev',
-    version: '2.27.1-shopify-ready',
+    version: '2.27.2-oauth-separator-fix',
     routes: {
       presentation: '/presentacion',
       presentationStatic: '/presentacion.html',
